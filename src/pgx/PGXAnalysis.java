@@ -15,9 +15,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import pgx.localDB.PGXDB;
-import pgx.localDB.PGXDBFunctions;
-import pgx.localDB.PGXDBFunctions.PGXMarker;
 import org.ut.biolab.medsavant.MedSavantClient;
 import org.ut.biolab.medsavant.client.project.ProjectController;
 import org.ut.biolab.medsavant.client.reference.ReferenceController;
@@ -32,6 +29,9 @@ import org.ut.biolab.medsavant.shared.format.CustomField;
 import org.ut.biolab.medsavant.shared.model.SessionExpiredException;
 import org.ut.biolab.medsavant.shared.serverapi.AnnotationManagerAdapter;
 import org.ut.biolab.medsavant.shared.serverapi.VariantManagerAdapter;
+import pgx.localDB.PGXDB;
+import pgx.localDB.PGXDBFunctions;
+import pgx.localDB.PGXDBFunctions.PGXMarker;
 
 /**
  * Performs a pharmacogenomic analysis for this individual.

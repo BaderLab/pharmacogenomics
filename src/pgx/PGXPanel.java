@@ -30,8 +30,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextField;
 import javax.swing.ScrollPaneConstants;
-import pgx.localDB.PGXDBFunctions;
-import pgx.localDB.PGXDBFunctions.PGXMarker;
 import net.miginfocom.swing.MigLayout;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -50,6 +48,8 @@ import org.ut.biolab.medsavant.shared.appdevapi.Variant;
 import org.ut.biolab.medsavant.shared.db.TableSchema;
 import org.ut.biolab.medsavant.shared.format.CustomField;
 import org.ut.biolab.medsavant.shared.serverapi.AnnotationManagerAdapter;
+import pgx.localDB.PGXDBFunctions;
+import pgx.localDB.PGXDBFunctions.PGXMarker;
 
 /**
  * Default panel for Pharmacogenomics app.
@@ -225,7 +225,7 @@ public class PGXPanel extends JPanel {
 		
 		patientSideJP.add(choosePatientButton, "alignx center, wrap");
 		patientSideJP.add(new JLabel("This app uses the CPIC guidelines"), "alignx center, gapy 20px, wrap");
-		patientSideJP.add(new JLabel("BETA TESTING!"), "alignx center, gapy 20px, wrap");
+		patientSideJP.add(new JLabel("BETA TESTING!!!"), "alignx center, gapy 20px, wrap");
 		patientSideJP.add(assumeRefCheckBox, "alignx center, gapy 20px, wrap");
 		patientSideJP.add(status, "alignx center, gapy 50px, wrap");
 		patientSideJP.add(statusWheel, "alignx center, wrap");
@@ -327,7 +327,7 @@ public class PGXPanel extends JPanel {
 		summary.setLayout(new MigLayout("gapx 30px"));
 		summary.add(createLabel("Gene", true, 20));
 		summary.add(createLabel("Diplotype", true, 20));
-		summary.add(createLabel("Metabolizer class", true, 20), "wrap");
+		summary.add(createLabel("Therapeutic class", true, 20), "wrap");
 		for (PGXGene pg : currentPGXAnalysis.getGenes()) {
 			summary.add(createLabel(pg.getGene(), false, 20));
 			summary.add(createLabel(pg.getDiplotype(), false, 20));
@@ -343,7 +343,7 @@ public class PGXPanel extends JPanel {
 			reportJP.add(createLabel("Diplotype", true, 22));
 			reportJP.add(createLabel(pg.getDiplotype(), false, 22), "wrap");
 			
-			reportJP.add(createLabel("Metabolizer class", true, 22));
+			reportJP.add(createLabel("Therapeutic class", true, 22));
 			reportJP.add(createLabel(pg.getMetabolizerClass(), false, 22), "wrap");
 			
 			/* Add pubmed links. */
@@ -374,34 +374,47 @@ public class PGXPanel extends JPanel {
 			geneSummaryJP.setLayout(new MigLayout("gapx 20px"));
 			String phasedTextAddition= "";
 			if (!pg.isPhased())
-				phasedTextAddition= "NOT ";	
+				phasedTextAddition= "NOT ";
 			geneSummaryJP.add(createLabel("Genotypes are " + phasedTextAddition +
 				"phased.", true, 20), "alignx center, span");
 			
-			// haplotype details
-			geneSummaryJP.add(createLabel("Haplotype #1", true, 16));
-			geneSummaryJP.add(createLabel(pg.getMaternalHaplotype(), false, 16), "gapy 20px, wrap");
-			geneSummaryJP.add(createLabel("Haplotype #2", true, 16));
-			geneSummaryJP.add(createLabel(pg.getPaternalHaplotype(), false, 16), "wrap");
-			geneSummaryJP.add(createLabel("Haplotype #1 activity", true, 16));
-			geneSummaryJP.add(createLabel(pg.getMaternalActivity(), false, 16), "wrap");
-			geneSummaryJP.add(createLabel("Haplotype #2 activity", true, 16));
-			geneSummaryJP.add(createLabel(pg.getPaternalActivity(), false, 16), "wrap");
-			
+			// haplotype details - only add if the haplotypes exist (if genotypes
+			// are phased).
+			if (pg.isPhased()) {
+				geneSummaryJP.add(createLabel("Haplotype #1", true, 16));
+				geneSummaryJP.add(createLabel(pg.getMaternalHaplotype(), false, 16), "gapy 20px, wrap");
+				geneSummaryJP.add(createLabel("Haplotype #2", true, 16));
+				geneSummaryJP.add(createLabel(pg.getPaternalHaplotype(), false, 16), "wrap");
+				geneSummaryJP.add(createLabel("Haplotype #1 activity", true, 16));
+				geneSummaryJP.add(createLabel(pg.getMaternalActivity(), false, 16), "wrap");
+				geneSummaryJP.add(createLabel("Haplotype #2 activity", true, 16));
+				geneSummaryJP.add(createLabel(pg.getPaternalActivity(), false, 16), "wrap");
+			}
+			geneSummaryJP.revalidate();
 			subtabs.addTab(pg.getGene() + " summary", geneSummaryJP);
 			
 			/* Subpanel displaying all detected variants. */
 			JPanel hapDetails= new JPanel();
 			hapDetails.setLayout(new MigLayout("gapx 30px"));
+			String column1Heading= "Haplotype #1";
+			String column2Heading= "Haplotype #2";
+			if (!pg.isPhased()) {
+				// display unphased message again
+				hapDetails.add(createLabel("Genotypes are " + phasedTextAddition +
+				"phased.", true, 20), "alignx center, span");
+				column1Heading= "Unphased genotype #1";
+				column2Heading= "Unphased genotype #2";
+			}			
 			hapDetails.add(createLabel("Marker ID", true, 16));
-			hapDetails.add(createLabel("Haplotype #1", true, 16));
-			hapDetails.add(createLabel("Haplotype #2", true, 16));
+			hapDetails.add(createLabel(column1Heading, true, 16));
+			hapDetails.add(createLabel(column2Heading, true, 16));
 			hapDetails.add(createLabel("Observed/Inferred genotype", true, 16), "wrap");
 					
 			// Haplotype 1 and 2 have the same rsIDs
 			Map<String, PGXGenotype> hap1Genotypes= pg.getMaternalGenotypes();
 			Map<String, PGXGenotype> hap2Genotypes= pg.getPaternalGenotypes();
-			List<String> allRsIDs= new ArrayList(hap1Genotypes.keySet());
+			
+			List<String> allRsIDs= new ArrayList<String>(hap1Genotypes.keySet());
 			Collections.sort(allRsIDs); // sort the list of markers
 			for (String rsID : allRsIDs) {
 				PGXGenotype genotype1= hap1Genotypes.get(rsID);
@@ -410,7 +423,7 @@ public class PGXPanel extends JPanel {
 				String genotypeStatus= "observed";
 				Color fontColour= AppColors.Salem;
 				if (genotype1.getInferredStatus() || genotype2.getInferredStatus()) {
-					genotypeStatus= "inferred";
+					genotypeStatus= "inferred as reference";
 					fontColour= DEFAULT_LABEL_COLOUR;
 				}
 				
@@ -434,6 +447,7 @@ public class PGXPanel extends JPanel {
 						pgxm.alt}), true);
 				}
 			} catch (Exception e) {
+				errorDialog(e.getMessage());
 				e.printStackTrace();
 			}
 			subtabs.addTab("Tested markers for " + pg.getGene(), testedMarkersJP); 
@@ -471,6 +485,7 @@ public class PGXPanel extends JPanel {
 				fieldMap= 
 					am.getAnnotationFieldsByTag(LoginController.getInstance().getSessionID(), true);
 			} catch (Exception e) {
+				errorDialog(e.getMessage());
 				e.printStackTrace();
 			}
 			Set<CustomField> columnNames= fieldMap.get(CustomField.ALLELE_FREQUENCY_TAG);

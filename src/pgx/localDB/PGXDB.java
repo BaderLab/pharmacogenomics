@@ -24,12 +24,12 @@ public class PGXDB {
 	
 	private static final String db_path_prefix= "mem:pharmacogenomicsdb";
 	private static final String DB_URL= "jdbc:hsqldb:" + db_path_prefix;
-	private static final String GENE_MARKER_LIST_FILE_PATH= "/medsavant/pgx/localDBFiles/gene_marker_list.txt";
-	private static final String HAPLOTYPE_MARKERS_FILE_PATH= "/medsavant/pgx/localDBFiles/haplotype_markers.txt";
-	private static final String MARKER_COORDINATES_FILE_PATH= "/medsavant/pgx/localDBFiles/marker_coordinates.txt";
-	private static final String HAPLOTYPE_ACTIVITY_FILE_PATH= "/medsavant/pgx/localDBFiles/haplotype_activity.txt";
-	private static final String ACTIVITY_TO_METABOLIZER_FILE_PATH= "/medsavant/pgx/localDBFiles/activity_to_metabolizer.txt";
-	private static final String PHENOTYPE_TO_METABOLIZER_FILE_PATH= "/medsavant/pgx/localDBFiles/phenotype_to_metabolizer.txt";
+	private static final String GENE_MARKER_LIST_FILE_PATH= "/pgx/localDBFiles/gene_marker_list.txt";
+	private static final String HAPLOTYPE_MARKERS_FILE_PATH= "/pgx/localDBFiles/haplotype_markers.txt";
+	private static final String MARKER_COORDINATES_FILE_PATH= "/pgx/localDBFiles/marker_coordinates.txt";
+	private static final String HAPLOTYPE_ACTIVITY_FILE_PATH= "/pgx/localDBFiles/haplotype_activity.txt";
+	private static final String ACTIVITY_TO_METABOLIZER_FILE_PATH= "/pgx/localDBFiles/activity_to_metabolizer.txt";
+	private static final String PHENOTYPE_TO_METABOLIZER_FILE_PATH= "/pgx/localDBFiles/phenotype_to_metabolizer.txt";
 	private static final String GENE_MARKER_LIST_TABLE_NAME= "gene_marker_list";
 	private static final String HAPLOTYPE_MARKERS_TABLE_NAME= "haplotype_markers";
 	private static final String MARKER_COORDINATES_TABLE_NAME= "marker_coordinates";

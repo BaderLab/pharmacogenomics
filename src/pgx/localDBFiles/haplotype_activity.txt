@@ -94,3 +94,24 @@ SLCO1B1	*5		decreased	22617227
 SLCO1B1	*15		decreased	22617227
 SLCO1B1	*16		decreased	22617227
 SLCO1B1	*17		decreased	22617227
+VKORC1	*1		normal	21900891
+VKORC1	*2		decreased	21900891
+DPYD	*1		normal	23988873
+DPYD	*4		normal	23988873
+DPYD	*5		normal	23988873
+DPYD	*6		normal	23988873
+DPYD	*9A		normal	23988873
+DPYD	*2A		no activity	23988873
+DPYD	*13		no activity	23988873
+DPYD	rs67376798		no activity	23988873
+DPYD	*3		decreased	23988873
+DPYD	*7		decreased	23988873
+DPYD	*8		decreased	23988873
+DPYD	*9B		decreased	23988873
+DPYD	*10		decreased	23988873
+DPYD	*11		decreased	23988873
+DPYD	*12		decreased	23988873
+CFTR	G551D		normal	24598717
+CFTR	Reference		no activity	24598717
+IFNL3	Reference		normal	24096968
+IFNL3	rs12979860		decreased	24096968

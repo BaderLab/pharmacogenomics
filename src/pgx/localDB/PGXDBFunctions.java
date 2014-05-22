@@ -14,12 +14,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import pgx.PGXException;
-import pgx.PGXGene;
-import pgx.PGXGenotype;
 import org.apache.commons.lang3.StringUtils;
 import org.ut.biolab.medsavant.shared.appdevapi.DBAnnotationColumns;
 import org.ut.biolab.medsavant.shared.appdevapi.Variant;
+import pgx.PGXException;
+import pgx.PGXGene;
+import pgx.PGXGenotype;
 
 /**
  * Assorted DB functions.
@@ -32,6 +32,7 @@ public class PGXDBFunctions {
 	public static final int SIMILAR_HAPLOTYPE_DEPTH= 3;
 	public static final String UNKNOWN_HAPLOTYPE= "UNKNOWN";
 	public static final String PIPE= "\\|";
+	public static final String GT_SEPARATOR= "[\\|/]";
 	
 	
 	/** 
@@ -133,17 +134,19 @@ public class PGXDBFunctions {
 			 * and the GT field length exceed 1 (ie. is not a phased haploid
 			 * locus), this variant is unphased.*/
 			Matcher m= Pattern.compile(PIPE).matcher(v.getGT());
-			if (m.find()) {
-				String[] gt= v.getGT().split(PIPE); // split on "|"
-				int maternalGT= Integer.parseInt(gt[0]);
-				int paternalGT= Integer.parseInt(gt[1]);
-			
-				String currentRsID= (String) v.getColumn(DBAnnotationColumns.DBSNP_TEXT);
-				maternalGenotypes.put(currentRsID, new PGXGenotype(refAndAlts[maternalGT], false));
-				paternalGenotypes.put(currentRsID, new PGXGenotype(refAndAlts[paternalGT], false));
-			} else if (v.getGT().length() > 1) {
+			if (!m.find() && v.getGT().length() > 1) {
 				pg.setUnphased();
 			}
+			
+			/* Store the phased variants, OR store the unphased genotypes after
+			 * the isPhased flag is set to false.*/
+			String[] gt= v.getGT().split(GT_SEPARATOR); // split on "|" or "/"
+			int maternalGT= Integer.parseInt(gt[0]);
+			int paternalGT= Integer.parseInt(gt[1]);
+
+			String currentRsID= (String) v.getColumn(DBAnnotationColumns.DBSNP_TEXT);
+			maternalGenotypes.put(currentRsID, new PGXGenotype(refAndAlts[maternalGT], false));
+			paternalGenotypes.put(currentRsID, new PGXGenotype(refAndAlts[paternalGT], false));
 		}
 		
 		/* Update the gene object with the phased genotypes. */
@@ -157,20 +160,24 @@ public class PGXDBFunctions {
 	 * @param pg the gene-variants pair object
 	 * @param assumeRef if true and a marker is missing, assumes reference nucleotide. If false, marker is left blank.
 	 * @return a String of the diplotype in the form "*1/*17" NOT with the gene
-	 *	like "CYP2C19*1/*17"; null if this gene has no * diplotypes or if 
+	 *	like "CYP2C19*1/*17"; "unknown" if this gene has no * diplotypes or if 
 	 *  the genotypes are unphased.
 	 */
 	public static String getDiplotype(PGXGene pg, boolean assumeRef) throws PGXException, SQLException {	
-		String diplotype= null;
+		String diplotype= "unknown";
 		
 		/* Assign the phased parental genotypes to be used for haplotype translation. */
 		assignParentalGenotypes(pg);
-		
-		/* Continue only if the genotypes are phased. */
-		if (pg.isPhased()) {
-			Map<String, PGXGenotype> maternalGenotypes= pg.getMaternalGenotypes();
-			Map<String, PGXGenotype> paternalGenotypes= pg.getPaternalGenotypes();
 
+		/* Get the genotypes even if they are not phased. The UI should display
+		* the phased status of this gene (PGXGene), so these can be displayed
+		* as unphased genotypes. */
+		Map<String, PGXGenotype> maternalGenotypes= pg.getMaternalGenotypes();
+		Map<String, PGXGenotype> paternalGenotypes= pg.getPaternalGenotypes();
+		
+		/* Get haplotypes if genotypes are phased, otherwise, add the reference
+		 * calls to the PGXGene if assumeRef is true. */
+		if (pg.isPhased()) {		
 			/* Get the haplotypes and check for novel ones (ie. no match found).
 			 * If a haplotype is novel, output "UNKNOWN" and then append the most
 			 * similar haplotype. */
@@ -201,6 +208,10 @@ public class PGXDBFunctions {
 			haplotypes.add(paternalHaplotype);
 			Collections.sort(haplotypes, new NaturalOrderComparator());			
 			diplotype= haplotypes.get(0) + "/" + haplotypes.get(1);
+		} else if (!pg.isPhased() && assumeRef) {
+			// Assign reference genotypes if they're missing.
+			assignReferenceGenotypes(pg.getGene(), maternalGenotypes);
+			assignReferenceGenotypes(pg.getGene(), paternalGenotypes);
 		}
 		
 		return diplotype;
@@ -276,6 +287,34 @@ public class PGXDBFunctions {
 	
 	
 	/**
+	 * Assign reference genotypes to missing markers.
+	 * @param gene the gene name/symbol
+	 * @param markerGenotypePairs a hash of marker-genotype pairs
+	 * @return a string representing the * nomenclature haplotype for this hash, empty string if no haplotype found
+	 * @throws PGXException
+	 * @throws SQLException
+	 */
+	private static void assignReferenceGenotypes(String gene, Map<String, PGXGenotype> markerGenotypePairs)
+		throws PGXException, SQLException {
+		
+		Map<String, String> markerRef= getMarkerRefMap(gene);
+		
+		/* Iterate over the markers and add inferred reference genotypes if they
+		 * are absent from the variant data. */
+		for (String marker : getMarkers(gene)) {
+			if (!markerGenotypePairs.containsKey(marker) &&
+				markerRef.containsKey(marker)) { // some markers don't have a ref call, ignore for now
+				
+				// Add this marker to the list of inferred markers for this haplotype
+				markerGenotypePairs.put(marker, new PGXGenotype(markerRef.get(marker), true));
+			}
+				
+		}		
+		
+	}
+	
+	
+	/**
 	 * Return a map of reference nucleotides keyed by marker ID, for this gene.
 	 * @param gene The gene symbol
 	 * @return a Map of reference nucleotides keyed by marker ID
@@ -326,6 +365,11 @@ public class PGXDBFunctions {
 		 * because that's what my sublists method takes. */
 		List<Pair> originalMarkers= new ArrayList<Pair>();
 		for (String marker : markerGenotypePairs.keySet()) {
+			/* NOTE: in the current version of this class, reference genotypes 
+			 * may have been added to the markerGenotypePairs (they're not 
+			 * explicitly exlcuded by checking the marker inferrence booleand.
+			 * This can be modified later by on including genotypes that are
+			 * "observed" and not "inferred". */	
 			originalMarkers.add(new Pair(marker, markerGenotypePairs.get(marker).getGenotype()));
 		}
 		
@@ -337,7 +381,7 @@ public class PGXDBFunctions {
 		 * than those that can only be found after removing 3. */
 		boolean found= false;
 		for (int depth= 0; depth <= remove && !found; ++depth) {
-			Set<List<Pair>> similarMarkers= Sublists.Sublists.sublists(originalMarkers, remove);
+			Set<List<Pair>> similarMarkers= Sublists.Sublists.sublists(originalMarkers, depth);
 		
 			/* For each of the sublists, look for a matching haplotype. */
 			for (List<Pair> lop : similarMarkers) { // "lop" = "list of pairs"
@@ -348,23 +392,12 @@ public class PGXDBFunctions {
 				
 				// Convert the List<Pair> back to a Map<String, String>
 				Map<String, String> sublistMap= convertListOfPairsToMap(lop);
-				//List<String> sublistOmitted= getOmitted(markerGenotypePairs, sublistMap);
 				
 				/* Iterate over the markers and construct a query for the local DB.
 				 * Marker order doesn't affect the query. */
-				for (String marker : getMarkers(gene)) {
-
-					/* This is where things start to get a little tricky. Unlike 
-					 * in getHaplotype(), things need not be as precise when
-					 * identifying a "similar" haplotype, since it is not intended
-					 * to be an exact match. In this case, we start off with the
-					 * list of variants but do not add any reference calls for
-					 * missing markers. If nothing is identified in this "loose"
-					 * matching query, remove a marker and try again. */				
+				for (String marker : getMarkers(gene)) {			
 					if (sublistMap.containsKey(marker)) {
 						sql +=	"	AND marker_info LIKE '%" + marker + "=" + sublistMap.get(marker) +"%' ";
-					//} else if (!sublistOmitted.contains(marker) && markerRef.containsKey(marker)) { // some markers don't have a ref call, ignore for now
-					//	sql +=	"	AND marker_info LIKE '%" + marker + "=" + markerRef.get(marker) +"%' ";
 					}
 				}
 				
