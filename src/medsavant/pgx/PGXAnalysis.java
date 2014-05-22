@@ -333,9 +333,6 @@ public class PGXAnalysis {
 			for (Condition c : novelPGXConditions) {
 				query.addCondition(c);
 			}
-
-			// TESTING
-			System.err.println("TEST query: " + query.toString()); ////////////////
 			
 			/* Once query is built, run it on the remote server. */
 			List<Variant> potentialNovelVariants= runRemoteQuery(query);
