@@ -1,4 +1,4 @@
-package medsavant.pgx;
+package pgx;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;

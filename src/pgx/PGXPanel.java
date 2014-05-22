@@ -1,4 +1,4 @@
-package medsavant.pgx;
+package pgx;
 
 import com.jidesoft.swing.ButtonStyle;
 import com.jidesoft.swing.JideButton;
@@ -30,8 +30,8 @@ import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextField;
 import javax.swing.ScrollPaneConstants;
-import medsavant.pgx.localDB.PGXDBFunctions;
-import medsavant.pgx.localDB.PGXDBFunctions.PGXMarker;
+import pgx.localDB.PGXDBFunctions;
+import pgx.localDB.PGXDBFunctions.PGXMarker;
 import net.miginfocom.swing.MigLayout;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -225,7 +225,7 @@ public class PGXPanel extends JPanel {
 		
 		patientSideJP.add(choosePatientButton, "alignx center, wrap");
 		patientSideJP.add(new JLabel("This app uses the CPIC guidelines"), "alignx center, gapy 20px, wrap");
-		patientSideJP.add(new JLabel("BETA TESTING! ONLY WORKS WITH WGS NOT EXOMES."), "alignx center, gapy 20px, wrap");
+		patientSideJP.add(new JLabel("BETA TESTING!"), "alignx center, gapy 20px, wrap");
 		patientSideJP.add(assumeRefCheckBox, "alignx center, gapy 20px, wrap");
 		patientSideJP.add(status, "alignx center, gapy 50px, wrap");
 		patientSideJP.add(statusWheel, "alignx center, wrap");

@@ -1,4 +1,4 @@
-package medsavant.pgx.localDB;
+package pgx.localDB;
 
 import CSVLoader.CSVLoader;
 import java.io.File;

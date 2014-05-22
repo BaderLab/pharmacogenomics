@@ -1,4 +1,4 @@
-package medsavant.pgx;
+package pgx;
 
 import com.healthmarketscience.sqlbuilder.BinaryCondition;
 import com.healthmarketscience.sqlbuilder.ComboCondition;
@@ -15,9 +15,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import medsavant.pgx.localDB.PGXDB;
-import medsavant.pgx.localDB.PGXDBFunctions;
-import medsavant.pgx.localDB.PGXDBFunctions.PGXMarker;
+import pgx.localDB.PGXDB;
+import pgx.localDB.PGXDBFunctions;
+import pgx.localDB.PGXDBFunctions.PGXMarker;
 import org.ut.biolab.medsavant.MedSavantClient;
 import org.ut.biolab.medsavant.client.project.ProjectController;
 import org.ut.biolab.medsavant.client.reference.ReferenceController;

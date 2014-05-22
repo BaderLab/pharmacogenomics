@@ -1,4 +1,4 @@
-package medsavant.pgx;
+package pgx;
 
 /**
  * Simple class to store genotypes and the status of the genotype, including whether it was

@@ -1,4 +1,4 @@
-package medsavant.pgx;
+package pgx;
 
 import javax.swing.ImageIcon;
 import javax.swing.JPanel;
@@ -12,7 +12,7 @@ import org.ut.biolab.medsavant.shared.appapi.MedSavantDashboardApp;
  */
 public class PGXApp extends MedSavantDashboardApp {
 
-    private static final String iconroot= "/medsavant/pgx/icon/";
+    private static final String iconroot= "/pgx/icon/";
     
     private PGXPanel p;
 

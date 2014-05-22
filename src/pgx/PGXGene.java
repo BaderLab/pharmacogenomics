@@ -1,4 +1,4 @@
-package medsavant.pgx;
+package pgx;
 
 import java.util.LinkedList;
 import java.util.List;

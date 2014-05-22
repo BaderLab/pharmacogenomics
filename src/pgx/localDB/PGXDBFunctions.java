@@ -1,4 +1,4 @@
-package medsavant.pgx.localDB;
+package pgx.localDB;
 
 import NaturalSorting.NaturalOrderComparator;
 import java.sql.ResultSet;
@@ -14,9 +14,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import medsavant.pgx.PGXException;
-import medsavant.pgx.PGXGene;
-import medsavant.pgx.PGXGenotype;
+import pgx.PGXException;
+import pgx.PGXGene;
+import pgx.PGXGenotype;
 import org.apache.commons.lang3.StringUtils;
 import org.ut.biolab.medsavant.shared.appdevapi.DBAnnotationColumns;
 import org.ut.biolab.medsavant.shared.appdevapi.Variant;
