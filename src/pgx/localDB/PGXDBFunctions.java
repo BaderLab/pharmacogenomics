@@ -104,7 +104,7 @@ public class PGXDBFunctions {
 	
 	/**
 	 * Assign the maternal and paternal phased genotypes for this gene.
-	 * Once assigned, the input object stores these phased genotype hashes/maps
+	 * Once assigned, the input PGXGene object stores the phased genotype hashes/maps
 	 * of marker, nucleotide (ref/alt) pairs.
 	 * @param pg the gene-variants pair object
 	 */
@@ -113,21 +113,25 @@ public class PGXDBFunctions {
 		Map<String, PGXGenotype> maternalGenotypes= new HashMap<String, PGXGenotype>();
 		Map<String, PGXGenotype> paternalGenotypes= new HashMap<String, PGXGenotype>();
 		
-		/* Iterate through the Variants and grab the haplotypes. Look for the
-		 * correct alternate number when processing the GT fields. So, if the 
-		 * field is 0|2 and we're on alt_number = 1, skip that variant.
-		 * PRECONDITION: We do not deal with two non-zero alleles in the same GT
-		 * field. The reason I'm making this assumption is that dbSNP variants
-		 * are annotation by chr, position, ref and alt. A line that is recorded
-		 * as having 1/2 will refer to two different alt positions, and since 
-		 * the PGXAnalysis queries by rsID, I don't anticipate GT fields like
-		 * this. However, I'm adding a check in here anyway. */
+		/* Iterate through the Variants and group alternate alleles together
+		 * under the same key in the Map. This is because a single variant can
+		 * have a single Reference nucleotide, but multiple Alternate nucleotides. */
+		Map<String, String[]> variantMap= new HashMap<String, String[]>();
 		for (Variant v : pg.getVariants()) {
+			String key= v.getChromosome() + "_" + v.getStart(); // the underscore is critical; don't delete it
+			
+			if (!variantMap.containsKey(key)) {
+				// Arbitrary large array of size 100, anticipating 100 max
+				// alternate elements. Admittedly, this is not the best style,
+				// but it would a better use of time to rearchitect the MedSavant DB.
+				variantMap.put(key, new String[100]);
+			}
+					
 			// populate an array of ref and alt for this allele- not all values 
-			// will be initialized, it's just for simplicity below.
-			String[] refAndAlts= new String[v.getAlternateNumber() + 1];
+			// will be initialized, it's just for simplicity later.
+			String[] refAndAlts= variantMap.get(key);
 			// 0 = ref, 1 = alt_number_1, 2 = alt_number_2, etc.
-			refAndAlts[0]= v.getReference();
+			refAndAlts[0]= v.getReference(); // the value at 0 may be changed more than once, it's ok
 			refAndAlts[v.getAlternateNumber()]= v.getAlternate();
 			
 			/* Make sure ALL variants are phased. That is, if a "|" is missing
@@ -137,13 +141,18 @@ public class PGXDBFunctions {
 			if (!m.find() && v.getGT().length() > 1) {
 				pg.setUnphased();
 			}
+		}
 			
-			/* Store the phased variants, OR store the unphased genotypes after
-			 * the isPhased flag is set to false.*/
+		/* Now that all the reference and alternate alleles have been identified
+		 * for each variant (specifically those that have multiple alternate
+		 * alleles), store the phased variants, OR store the unphased genotypes after
+		 * the isPhased flag is set to false.*/
+		for (Variant v : pg.getVariants()) {
 			String[] gt= v.getGT().split(GT_SEPARATOR); // split on "|" or "/"
 			int maternalGT= Integer.parseInt(gt[0]);
 			int paternalGT= Integer.parseInt(gt[1]);
-
+			String key= v.getChromosome() + "_" + v.getStart(); // the underscore is critical; don't delete it
+			String[] refAndAlts= variantMap.get(key);
 			String currentRsID= (String) v.getColumn(DBAnnotationColumns.DBSNP_TEXT);
 			maternalGenotypes.put(currentRsID, new PGXGenotype(refAndAlts[maternalGT], false));
 			paternalGenotypes.put(currentRsID, new PGXGenotype(refAndAlts[paternalGT], false));

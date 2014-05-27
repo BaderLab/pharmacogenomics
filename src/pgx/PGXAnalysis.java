@@ -329,6 +329,13 @@ public class PGXAnalysis {
 			query.addCondition(
 				BinaryCondition.iLike(ts.getDBColumn(BasicVariantColumns.JANNOVAR_SYMBOL), geneSymbol + "%"));
 			
+			/* Ensure that the patient actually has this variant, and is not
+			 * homozygous for the reference. This is important if reference 
+			 * positions are reported, which happens in a pgx analysis. In
+			 * general, VCF files do not report homozygous ref positions. */
+			query.addCondition(
+				BinaryCondition.notiLike(ts.getDBColumn(BasicVariantColumns.GT), "0%0"));
+			
 			/* Add all default novel Conditions to this query. */
 			for (Condition c : novelPGXConditions) {
 				query.addCondition(c);

@@ -55,7 +55,7 @@ import pgx.localDB.PGXDBFunctions.PGXMarker;
  * Default panel for Pharmacogenomics app.
  * @author rammar
  */
-public class PGXPanel extends JPanel {
+public class PGXPanel {
 
 	private static Log log= LogFactory.getLog(MedSavantClient.class);
 	private static final int CHOOSE_PATIENT_BUTTON_WIDTH= 250;
@@ -507,6 +507,7 @@ public class PGXPanel extends JPanel {
 			novelVariantsJP.add(createLabel("Chrom", true, FONT_SIZE));
 			novelVariantsJP.add(createLabel("Position", true, FONT_SIZE));
 			novelVariantsJP.add(createLabel("Effect", true, FONT_SIZE));
+			novelVariantsJP.add(createLabel("Zygosity", true, FONT_SIZE));
 			for (String afName : afColumnNames) {
 				novelVariantsJP.add(createLabel(afName, true, FONT_SIZE));
 			}
@@ -520,6 +521,7 @@ public class PGXPanel extends JPanel {
 			novelVariantsJP.add(createLabel(var.getChromosome(), false, FONT_SIZE));
 			novelVariantsJP.add(createLabel(Long.toString(var.getStart()), false, FONT_SIZE));
 			novelVariantsJP.add(createLabel(var.getMutationType(), false, FONT_SIZE));
+			novelVariantsJP.add(createLabel(var.getZygosity(), false, FONT_SIZE));
 			for (String afName : afColumnNames) {
 				BigDecimal afValue= (BigDecimal) var.getColumn(afName);
 				String afValueString= "N/A";
