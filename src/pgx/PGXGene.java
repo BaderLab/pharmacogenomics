@@ -166,6 +166,14 @@ public class PGXGene {
 	}
 	
 	
+	/** 
+	 * Set this gene's genotypes as phased. They are marked as phased by default.
+	 */
+	public void setPhased() {
+		this.isPhased= true;
+	}
+	
+	
 	/**
 	 * Find out if this gene's genotypes are phased.
 	 * @return true is phased, false otherwise

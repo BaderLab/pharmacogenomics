@@ -6,6 +6,7 @@ import com.healthmarketscience.sqlbuilder.Condition;
 import com.healthmarketscience.sqlbuilder.UnaryCondition;
 import com.healthmarketscience.sqlbuilder.dbspec.basic.DbColumn;
 import jannovar.common.VariantType;
+import java.math.BigInteger;
 import java.rmi.RemoteException;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -181,10 +182,20 @@ public class PGXAnalysis {
 				ComboCondition query= new ComboCondition(ComboCondition.Op.OR);
 				
 				try {
-					// add all the markers for this gene
-					for (String m : PGXDBFunctions.getMarkers(g)) {
-						query.addCondition(
-							BinaryCondition.equalTo(ts.getDBColumn(columns.get(DBSNP_COLUMN)), m));
+					/* Add all the marker positions for this gene.
+					 * NOTE: You can also search for variants using the dbSNP rsID,
+					 * however, then you rely on the DB to be up-to-date and annotated
+					 * correctly, which is not always the case. It's better to query
+					 * variants by chromosomal coordinates. Original code is commented
+					 * out below. */
+					for (PGXMarker pgxm : PGXDBFunctions.getMarkerInfo(g)) {
+						ComboCondition variantCondition= new ComboCondition(ComboCondition.Op.AND);
+						variantCondition.addCondition(
+							BinaryCondition.equalTo(ts.getDBColumn(BasicVariantColumns.CHROM), pgxm.chromosome));
+						variantCondition.addCondition(
+							BinaryCondition.equalTo(ts.getDBColumn(BasicVariantColumns.START_POSITION), Integer.parseInt(pgxm.position)));	
+						
+						query.addCondition(variantCondition);
 					}
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -295,9 +306,9 @@ public class PGXAnalysis {
 			query.addCondition(
 				BinaryCondition.equalTo(ts.getDBColumn(BasicVariantColumns.DNA_ID), dnaID));
 			query.addCondition(standardPGXConditions.get(geneKey));
-
+			
 			/* Once query is built, run it on the remote server. */
-			List<Variant> retrievedVariants= runRemoteQuery(query);
+			List<Variant> retrievedVariants= runRemoteQuery(query);			
 			
 			/* Add variants to the list for this PGx gene. */
 			for (Variant var : retrievedVariants) {

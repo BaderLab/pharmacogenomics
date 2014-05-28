@@ -34,7 +34,6 @@ public class PGXDBFunctions {
 	public static final String PIPE= "\\|";
 	public static final String GT_SEPARATOR= "[\\|/]";
 	
-	
 	/** 
 	 * Get all genes in the database.
 	 * @return a List of all genes in this DB.
@@ -108,7 +107,7 @@ public class PGXDBFunctions {
 	 * of marker, nucleotide (ref/alt) pairs.
 	 * @param pg the gene-variants pair object
 	 */
-	public static void assignParentalGenotypes(PGXGene pg) {
+	public static void assignParentalGenotypes(PGXGene pg) throws SQLException {
 		/* Hash of marker, nucleotide (ref/alt) pairs. */
 		Map<String, PGXGenotype> maternalGenotypes= new HashMap<String, PGXGenotype>();
 		Map<String, PGXGenotype> paternalGenotypes= new HashMap<String, PGXGenotype>();
@@ -142,25 +141,36 @@ public class PGXDBFunctions {
 				pg.setUnphased();
 			}
 		}
-			
+		
 		/* Now that all the reference and alternate alleles have been identified
 		 * for each variant (specifically those that have multiple alternate
 		 * alleles), store the phased variants, OR store the unphased genotypes after
 		 * the isPhased flag is set to false.*/
 		for (Variant v : pg.getVariants()) {
 			String[] gt= v.getGT().split(GT_SEPARATOR); // split on "|" or "/"
-			int maternalGT= Integer.parseInt(gt[0]);
-			int paternalGT= Integer.parseInt(gt[1]);
-			String key= v.getChromosome() + "_" + v.getStart(); // the underscore is critical; don't delete it
-			String[] refAndAlts= variantMap.get(key);
-			String currentRsID= (String) v.getColumn(DBAnnotationColumns.DBSNP_TEXT);
-			maternalGenotypes.put(currentRsID, new PGXGenotype(refAndAlts[maternalGT], false));
-			paternalGenotypes.put(currentRsID, new PGXGenotype(refAndAlts[paternalGT], false));
+			try {
+				int maternalGT= Integer.parseInt(gt[0]);
+				int paternalGT= Integer.parseInt(gt[1]);
+				String key= v.getChromosome() + "_" + v.getStart(); // the underscore is critical; don't delete it
+				String[] refAndAlts= variantMap.get(key);
+				//String currentRsID= (String) v.getColumn(DBAnnotationColumns.DBSNP_TEXT); // creates nulls sometimes, leading to errors.
+				String currentRsID= getMarkerID(v);
+				maternalGenotypes.put(currentRsID, new PGXGenotype(refAndAlts[maternalGT], false));
+				paternalGenotypes.put(currentRsID, new PGXGenotype(refAndAlts[paternalGT], false));
+			} catch (NumberFormatException nfe) {
+				continue; // Do not add this genotype for this individual because it's missing; happens with GT = "./."
+			}
 		}
 		
 		/* Update the gene object with the phased genotypes. */
 		pg.setMaternalGenotypes(maternalGenotypes);
 		pg.setPaternalGenotypes(paternalGenotypes);
+		
+		/* Final checking for phasing. Even if markers are unphased, if at most
+		 * two haplotypes are possible, the gene can be considered phased for 
+		 * our purposes. */
+		finalPhaseCheck(pg);
+		
 	}
 	
 	
@@ -368,7 +378,6 @@ public class PGXDBFunctions {
 		
 		/* Get the reference calls for all markers for this gene. */
 		Map<String, String> markerRef= getMarkerRefMap(gene);
-
 		
 		/* Create a List of Pair objects from all the markers. I need a list 
 		 * because that's what my sublists method takes. */
@@ -378,7 +387,7 @@ public class PGXDBFunctions {
 			 * may have been added to the markerGenotypePairs (they're not 
 			 * explicitly exlcuded by checking the marker inferrence booleand.
 			 * This can be modified later by on including genotypes that are
-			 * "observed" and not "inferred". */	
+			 * "observed" and not "inferred". */
 			originalMarkers.add(new Pair(marker, markerGenotypePairs.get(marker).getGenotype()));
 		}
 		
@@ -507,6 +516,37 @@ public class PGXDBFunctions {
 	
 	
 	/**
+	 * Final phasing check. If genotypes are unphased but at most two haplotypes are
+	 * possible (given the genotypes), for our purposes the genotypes can be 
+	 * treated as phased because only a single diplotype can be constructed.
+	 * @param pg The PGXGene object
+	 * @precondition The maternal and paternal genotype maps in pg have been set.
+	 */
+	public static void finalPhaseCheck(PGXGene pg) {
+		// maternal and paternal genotypes will have the same markers
+		Set<String> markers= pg.getMaternalGenotypes().keySet();
+		
+		int numberOfDifferentGenotypes= 0;
+		for (String m : markers) {
+			String genotype1= pg.getMaternalGenotypes().get(m).getGenotype();
+			String genotype2= pg.getPaternalGenotypes().get(m).getGenotype();
+			if (!genotype1.equals(genotype2)) {
+				++numberOfDifferentGenotypes;
+			}
+			// if 2 differences are found, no need to continue
+			if (numberOfDifferentGenotypes > 1) {
+				break;
+			}
+		}
+		
+		/* If at most 2 haplotypes are possible given the genotypes, set as phased. */
+		if (numberOfDifferentGenotypes <= 1) {
+			pg.setPhased();
+		}
+	}
+	
+	
+	/**
 	 * Inner class to represent gene and marker pairs as a single object.
 	 */
 	private static class Pair {
@@ -590,6 +630,29 @@ public class PGXDBFunctions {
 				output.add(new PGXMarker(marker, (String) row.get(0),
 					(String) row.get(1), (String) row.get(2), (String) row.get(3)));
 			}
+		}
+				
+		return output;
+	}
+	
+	
+	/**
+	 * Return a the marker ID for the variant.
+	 * @return the marker ID String; null if it doesn't exist
+	 */
+	public static String getMarkerID(Variant var) throws SQLException {
+		String output= null;
+		
+		String sql;
+		sql=	"SELECT M.marker " +
+				"FROM marker_coordinates M " + 
+				"WHERE M.chromosome = '" + var.getChromosome() + "' " +
+				"	AND M.position = " + var.getStart() + " ";
+		ResultSet rs= PGXDB.executeQuery(sql);
+
+		if (rs.next()) {
+			List row= PGXDB.getRowAsList(rs);
+			output= (String) row.get(0);
 		}
 				
 		return output;

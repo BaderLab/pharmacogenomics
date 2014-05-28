@@ -157,11 +157,12 @@ public class PGXPanel {
 				/* Once the user has made a patient hospital ID selection, get 
 				 * the DNA ID so we can retrieve the patient's variants. */
 				if (patientSelector.hasMadeSelection()) {
-					currentHospitalID= selectedIndividuals.iterator().next();
-					currentDNAID= patientSelector.getDNAIDsOfSelectedIndividuals().iterator().next();
+					currentHospitalID= patientSelector.getHospitalIDsOfSelectedIndividuals().iterator().next();
+					String newDNAID= patientSelector.getDNAIDsOfSelectedIndividuals().iterator().next();
 					
-					if (currentDNAID != null) {
-						choosePatientButton.setText(currentHospitalID);
+					if (newDNAID != null) {
+						currentDNAID= newDNAID;
+						choosePatientButton.setText(currentHospitalID);						
 					} else { // can't find this individual's DNA ID - may be a DB error
 						errorDialog("Can't find a DNA ID for " + currentHospitalID);
 					}
@@ -325,7 +326,11 @@ public class PGXPanel {
 		/* Create a summary tab. */
 		JPanel summary= new JPanel();
 		summary.setLayout(new MigLayout("gapx 30px"));
-		summary.add(createLabel("Gene", true, 20));
+		summary.add(createLabel("Patient Hospital ID", true, 20));
+		summary.add(createLabel(this.currentHospitalID, false, 20), "wrap");
+		summary.add(createLabel("Patient DNA ID", true, 20));
+		summary.add(createLabel(this.currentDNAID, false, 20), "wrap");
+		summary.add(createLabel("Gene", true, 20), "gapy 20px");
 		summary.add(createLabel("Diplotype", true, 20));
 		summary.add(createLabel("Therapeutic class", true, 20), "wrap");
 		for (PGXGene pg : currentPGXAnalysis.getGenes()) {
