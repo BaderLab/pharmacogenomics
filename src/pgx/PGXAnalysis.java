@@ -6,11 +6,12 @@ import com.healthmarketscience.sqlbuilder.Condition;
 import com.healthmarketscience.sqlbuilder.UnaryCondition;
 import com.healthmarketscience.sqlbuilder.dbspec.basic.DbColumn;
 import jannovar.common.VariantType;
-import java.math.BigInteger;
 import java.rmi.RemoteException;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -296,7 +297,10 @@ public class PGXAnalysis {
 	 */
 	private void queryVariants() throws SQLException, RemoteException, SessionExpiredException {
 		/* Iterate through all gene conditions. */
-		for (String geneKey : standardPGXConditions.keySet()) {
+		List<String> allGeneKeys= new ArrayList<String>(standardPGXConditions.keySet());
+		// Sort the list of genes by gene symbol for convenience later
+		Collections.sort(allGeneKeys);
+		for (String geneKey : allGeneKeys) {
 			/* The variants for this gene. */
 			PGXGene pgxVariants= new PGXGene(geneKey);
 			

@@ -16,6 +16,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -349,15 +350,19 @@ public class PGXPanel {
 			reportJP.add(createLabel(pg.getDiplotype(), false, 22), "wrap");
 			
 			reportJP.add(createLabel("Therapeutic class", true, 22));
-			reportJP.add(createLabel(pg.getMetabolizerClass(), false, 22), "wrap");
+			reportJP.add(createLabel(pg.getMetabolizerClass(), false, 22), "gapafter 30px, wrap");
 			
 			/* Add pubmed links. */
-			reportJP.add(createLabel("Publications", true, 22), "gapy 30px, aligny top");
+			reportJP.add(createLabel("Publications", true, 22), "aligny top");
 			List<String> pubmedIDs= PGXDBFunctions.getPubMedIDs(pg.getGene());
 			for (int i= 0; i != pubmedIDs.size(); ++i) {
-				JButton jb= getURLButton(pubmedIDs.get(i), basePubmedUrl, pubmedIDs.get(i), true);
+				String pubmedButtonText= "Guidelines";
+				if (pubmedIDs.size() > 1) {
+					pubmedButtonText += " #" + (i + 1);
+				}
+				JButton jb= getURLButton(pubmedButtonText, basePubmedUrl, pubmedIDs.get(i), true);
 				jb.setFont(new Font(jb.getFont().getName(), Font.PLAIN, 22));
-				String constraintText= "gapy 30px, aligny top, ";
+				String constraintText= "aligny top, ";
 				// Set some spacing constraints for the pubmed links
 				if (i == 0 && pubmedIDs.size() > 1) {
 					constraintText += "split"; // if there are more than 1 IDs, stick them together visually
@@ -367,102 +372,52 @@ public class PGXPanel {
 				reportJP.add(jb, constraintText);
 			}
 			
+			/* Add genotype phase status. */
+			String phasedTextAddition= "";
+			if (!pg.isPhased())
+				phasedTextAddition= "NOT ";
+			reportJP.add(createLabel("Genotypes are " + phasedTextAddition + "phased.",
+				true, 20), "span");
+			
+			// No longer implementing the subpanels
 			/* Add a subpanel of tabs. */
+			/*
 			final JTabbedPane subtabs= ViewUtil.getMSTabedPane();
 			// span the entire panel width minus 50 pixels to make up for the gapx inset
 			subtabs.setPreferredSize(new Dimension(
 				reportPane.getSize().width - 50, subtabs.getPreferredSize().height));
+			*/
 			
 			/* Subpanel describing the individual's haplotypes/markers for this individual. */
-			// phased genotype status
 			JPanel geneSummaryJP= new JPanel();
-			geneSummaryJP.setLayout(new MigLayout("gapx 20px"));
-			String phasedTextAddition= "";
-			if (!pg.isPhased())
-				phasedTextAddition= "NOT ";
-			geneSummaryJP.add(createLabel("Genotypes are " + phasedTextAddition +
-				"phased.", true, 20), "alignx center, span");
-			
-			// haplotype details - only add if the haplotypes exist (if genotypes
-			// are phased).
-			if (pg.isPhased()) {
-				geneSummaryJP.add(createLabel("Haplotype #1", true, 16));
-				geneSummaryJP.add(createLabel(pg.getMaternalHaplotype(), false, 16), "gapy 20px, wrap");
-				geneSummaryJP.add(createLabel("Haplotype #2", true, 16));
-				geneSummaryJP.add(createLabel(pg.getPaternalHaplotype(), false, 16), "wrap");
-				geneSummaryJP.add(createLabel("Haplotype #1 activity", true, 16));
-				geneSummaryJP.add(createLabel(pg.getMaternalActivity(), false, 16), "wrap");
-				geneSummaryJP.add(createLabel("Haplotype #2 activity", true, 16));
-				geneSummaryJP.add(createLabel(pg.getPaternalActivity(), false, 16), "wrap");
-			}
+			geneSummaryJP.setLayout(new MigLayout("gapx 20px, insets n 0px n 0px"));
+			addHaplotypes(geneSummaryJP, pg);
 			geneSummaryJP.revalidate();
-			subtabs.addTab(pg.getGene() + " summary", geneSummaryJP);
+			//subtabs.addTab(pg.getGene() + " summary", geneSummaryJP);
 			
 			/* Subpanel displaying all detected variants. */
-			JPanel hapDetails= new JPanel();
-			hapDetails.setLayout(new MigLayout("gapx 30px"));
-			String column1Heading= "Haplotype #1";
-			String column2Heading= "Haplotype #2";
-			if (!pg.isPhased()) {
-				// display unphased message again
-				hapDetails.add(createLabel("Genotypes are " + phasedTextAddition +
-				"phased.", true, 20), "alignx center, span");
-				column1Heading= "Unphased genotype #1";
-				column2Heading= "Unphased genotype #2";
-			}			
-			hapDetails.add(createLabel("Marker ID", true, 16));
-			hapDetails.add(createLabel(column1Heading, true, 16));
-			hapDetails.add(createLabel(column2Heading, true, 16));
-			hapDetails.add(createLabel("Observed/Inferred genotype", true, 16), "wrap");
-					
-			// Haplotype 1 and 2 have the same rsIDs
-			Map<String, PGXGenotype> hap1Genotypes= pg.getMaternalGenotypes();
-			Map<String, PGXGenotype> hap2Genotypes= pg.getPaternalGenotypes();
-			
-			List<String> allRsIDs= new ArrayList<String>(hap1Genotypes.keySet());
-			Collections.sort(allRsIDs); // sort the list of markers
-			for (String rsID : allRsIDs) {
-				PGXGenotype genotype1= hap1Genotypes.get(rsID);
-				PGXGenotype genotype2= hap2Genotypes.get(rsID);
-				
-				String genotypeStatus= "observed";
-				Color fontColour= AppColors.Salem;
-				if (genotype1.getInferredStatus() || genotype2.getInferredStatus()) {
-					genotypeStatus= "inferred as reference";
-					fontColour= DEFAULT_LABEL_COLOUR;
-				}
-				
-				hapDetails.add(createLabel(rsID, false, 16, hapDetails.getBackground(), fontColour));
-				hapDetails.add(createLabel(genotype1.getGenotype(), false, 16, hapDetails.getBackground(), fontColour));
-				hapDetails.add(createLabel(genotype2.getGenotype(), false, 16, hapDetails.getBackground(), fontColour));
-				hapDetails.add(createLabel(genotypeStatus, false, 16, hapDetails.getBackground(), fontColour), "wrap");
-			}
-			subtabs.addTab("Haplotype details", hapDetails);
+			JPanel hapDetailsJP= new JPanel();
+			hapDetailsJP.setLayout(new MigLayout("gapx 15px, insets n 0px n 0px"));
+			addHaplotypeDetails(hapDetailsJP, pg);
+			//subtabs.addTab("Haplotype details", hapDetailsJP);
 			
 			/* Subpanel describing all the markers tested for this gene. */
 			JPanel testedMarkersJP= new JPanel();
-			testedMarkersJP.setLayout(new MigLayout("gapy 0px, gapx 30px")); // don't use fillx property here
-			try {
-				makeJPanelRow(testedMarkersJP, Arrays.asList(new String[]
-					{"Marker ID", "Chromosome", "Position", "Reference nucleotide",
-					"Alternate nucleotide"}), false);
-				for (PGXMarker pgxm : PGXDBFunctions.getMarkerInfo(pg.getGene())) {
-					makeJPanelRow(testedMarkersJP, Arrays.asList(new String[]
-						{pgxm.markerID,	pgxm.chromosome, pgxm.position, pgxm.ref,
-						pgxm.alt}), true);
-				}
-			} catch (Exception e) {
-				errorDialog(e.getMessage());
-				e.printStackTrace();
-			}
-			subtabs.addTab("Tested markers for " + pg.getGene(), testedMarkersJP); 
+			testedMarkersJP.setLayout(new MigLayout("gapy 0px, gapx 30px, insets n 0px n 0px")); // don't use fillx property here
+			addTestedMarkers(testedMarkersJP, pg);
+			//subtabs.addTab("Tested markers for " + pg.getGene(), testedMarkersJP); 
 			
 			/* Subpanel showing all the novel Variants for this gene. */
 			JPanel novelVariantsJP= getNovelVariantsPanel(pg);
-			subtabs.addTab("Novel variants", novelVariantsJP);
+			//subtabs.addTab("Novel variants", novelVariantsJP);
+			
+			/* Add subpanels to the main report panel. */
+			reportJP.add(geneSummaryJP, "span");
+			reportJP.add(hapDetailsJP, "span");
+			reportJP.add(novelVariantsJP, "span");			
 			
 			/* Add subtabs to the main report panel. */
-			reportJP.add(subtabs, "gapy 100px, span"); // need span here for column formatting of diplotype and metabolizer fields
+			//reportJP.add(subtabs, "gapy 100px, span"); // need span here for column formatting of diplotype and metabolizer fields			
 			
 			/* Add the main report panel for this gene to the tabs. */
 			tabs.addTab(pg.getGene(), reportJP);
@@ -472,12 +427,119 @@ public class PGXPanel {
 	}
 	
 	
+	/**
+	 * Add haplotypes to specified JPanel.
+	 * @param jp JPanel where haplotypes are being appended
+	 * @param pg the PGXGene object
+	 */
+	private void addHaplotypes(JPanel jp, PGXGene pg) {
+		// haplotype details - only add if the haplotypes exist (if genotypes
+		// are phased).
+		if (pg.isPhased()) {
+			jp.add(createLabel("Haplotype #1", true, 16));
+			jp.add(createLabel(pg.getMaternalHaplotype(), false, 16), "wrap");
+			jp.add(createLabel("Haplotype #2", true, 16));
+			jp.add(createLabel(pg.getPaternalHaplotype(), false, 16), "wrap");
+			jp.add(createLabel("Haplotype #1 activity", true, 16));
+			jp.add(createLabel(pg.getMaternalActivity(), false, 16), "wrap");
+			jp.add(createLabel("Haplotype #2 activity", true, 16));
+			jp.add(createLabel(pg.getPaternalActivity(), false, 16), "wrap");
+		}
+	}
+	
+	
+	/**
+	 * Add haplotype details to specified JPanel.
+	 * @param jp JPanel where haplotype details (genotypes) are being appended
+	 * @param pg the PGXGene object
+	 */
+	private void addHaplotypeDetails(JPanel jp, PGXGene pg) {
+		int FONT_SIZE= 16;
+		
+		String column1Heading= "Haplotype #1";
+		String column2Heading= "Haplotype #2";
+		if (!pg.isPhased()) {
+			column1Heading= "Unphased genotype #1";
+			column2Heading= "Unphased genotype #2";
+		}			
+		jp.add(createLabel("Marker ID", true, FONT_SIZE));
+		jp.add(createLabel(column1Heading, true, FONT_SIZE));
+		jp.add(createLabel(column2Heading, true, FONT_SIZE));
+		jp.add(createLabel("Observed/Inferred genotype", true, FONT_SIZE));
+		jp.add(createLabel("Chr", true, FONT_SIZE));
+		jp.add(createLabel("Position", true, FONT_SIZE));
+		jp.add(createLabel("Ref", true, FONT_SIZE));
+		jp.add(createLabel("Alt", true, FONT_SIZE), "wrap");
+		
+		Map<String, PGXMarker> markerLookup= new HashMap<String, PGXMarker>();
+		try {
+			markerLookup= PGXDBFunctions.getMarkerInfoMap(pg.getGene());
+		} catch (Exception e) {
+			errorDialog(e.getMessage());
+			e.printStackTrace();
+		}
+		
+		Map<String, PGXGenotype> hap1Genotypes= pg.getMaternalGenotypes();
+		Map<String, PGXGenotype> hap2Genotypes= pg.getPaternalGenotypes();
+		// Haplotype 1 and 2 have the same marker IDs
+		List<String> allRsIDs= new ArrayList<String>(hap1Genotypes.keySet());
+		Collections.sort(allRsIDs); // sort the list of markers
+		for (String rsID : allRsIDs) {
+			PGXGenotype genotype1= hap1Genotypes.get(rsID);
+			PGXGenotype genotype2= hap2Genotypes.get(rsID);
+
+			String genotypeStatus= "observed";
+			Color fontColour= AppColors.Salem;
+			if (genotype1.getInferredStatus() || genotype2.getInferredStatus()) {
+				genotypeStatus= "inferred as reference";
+				fontColour= DEFAULT_LABEL_COLOUR;
+			}
+			
+			JButton markerURLButton= getURLButton(rsID, baseDBSNPUrl, rsID, false);
+			markerURLButton.setFont(new Font(markerURLButton.getFont().getName(), Font.PLAIN, FONT_SIZE));
+			markerURLButton.setForeground(fontColour);
+			jp.add(markerURLButton);
+			jp.add(createLabel(genotype1.getGenotype(), false, FONT_SIZE, jp.getBackground(), fontColour));
+			jp.add(createLabel(genotype2.getGenotype(), false, FONT_SIZE, jp.getBackground(), fontColour));
+			jp.add(createLabel(genotypeStatus, false, FONT_SIZE, jp.getBackground(), fontColour));
+			// NOTE: All markers MUST be in the markerlookup map, so not checking
+			// for rsID presence as a key.
+			jp.add(createLabel(markerLookup.get(rsID).chromosome, false, FONT_SIZE, jp.getBackground(), fontColour));
+			jp.add(createLabel(markerLookup.get(rsID).position, false, FONT_SIZE, jp.getBackground(), fontColour));
+			jp.add(createLabel(markerLookup.get(rsID).ref, false, FONT_SIZE, jp.getBackground(), fontColour));
+			jp.add(createLabel(markerLookup.get(rsID).alt, false, FONT_SIZE, jp.getBackground(), fontColour), "wrap");
+		}
+	}
+	
+	
+	/**
+	 * Add tested marker details to specified JPanel.
+	 * @param jp JPanel where tested marker details (genotypes) are being appended
+	 * @param pg the PGXGene object
+	 */
+	private void addTestedMarkers(JPanel jp, PGXGene pg) {
+		try {
+			makeJPanelRow(jp, Arrays.asList(new String[]
+				{"Marker ID", "Chromosome", "Position", "Reference nucleotide",
+				"Alternate nucleotide"}), false);
+			for (PGXMarker pgxm : PGXDBFunctions.getMarkerInfo(pg.getGene())) {
+				makeJPanelRow(jp, Arrays.asList(new String[]
+					{pgxm.markerID,	pgxm.chromosome, pgxm.position, pgxm.ref,
+					pgxm.alt}), true);
+			}
+		} catch (Exception e) {
+			errorDialog(e.getMessage());
+			e.printStackTrace();
+		}
+	}
+	
+	
 	private JPanel getNovelVariantsPanel(PGXGene pg) {
 		int FONT_SIZE= 14;
 		
 		/* Subpanel showing all the novel Variants for this gene. */
 		JPanel novelVariantsJP= new JPanel();
-		novelVariantsJP.setLayout(new MigLayout("fillx"));
+		novelVariantsJP.setLayout(new MigLayout("fillx, gapx 15px, insets n 0px n 0px"));
 		
 		/* Get the names of the allele frequency columns, if not done already. */
 		if (afColumnNames == null) {
@@ -535,8 +597,11 @@ public class PGXPanel {
 				}
 				novelVariantsJP.add(createLabel(afValueString, false, FONT_SIZE));
 			}
-			novelVariantsJP.add(createLabel(
-				(String) var.getColumn(DBAnnotationColumns.DBSNP_TEXT), false, FONT_SIZE), "wrap");
+			
+			String rsID= (String) var.getColumn(DBAnnotationColumns.DBSNP_TEXT);
+			JButton markerURLButton= getURLButton(rsID, baseDBSNPUrl, rsID, false);
+			markerURLButton.setFont(new Font(markerURLButton.getFont().getName(), Font.PLAIN, FONT_SIZE));
+			novelVariantsJP.add(markerURLButton, "wrap");
 		}
 		
 		return novelVariantsJP;

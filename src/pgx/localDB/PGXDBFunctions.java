@@ -610,10 +610,10 @@ public class PGXDBFunctions {
 	/**
 	 * Return a list of all PGx markers, for this gene.
 	 * @param gene The gene symbol
-	 * @return a List of pgxMarker objects
+	 * @return a Map of PGXMarker objects keyed by markerID
 	 */
-	public static List<PGXMarker> getMarkerInfo(String gene) throws PGXException, SQLException {
-		List<PGXMarker> output= new LinkedList<PGXMarker>();
+	public static Map<String, PGXMarker> getMarkerInfoMap(String gene) throws PGXException, SQLException {
+		Map<String, PGXMarker> output= new HashMap<String, PGXMarker>();
 		
 		List<String> markerList= getMarkers(gene);
 		Collections.sort(markerList); // sort the list of markers
@@ -627,12 +627,22 @@ public class PGXDBFunctions {
 			
 			if (rs.next()) {
 				List row= PGXDB.getRowAsList(rs);
-				output.add(new PGXMarker(marker, (String) row.get(0),
+				output.put(marker, new PGXMarker(marker, (String) row.get(0),
 					(String) row.get(1), (String) row.get(2), (String) row.get(3)));
 			}
 		}
 				
 		return output;
+	}
+	
+	
+	/**
+	 * Return a list of all PGx markers, for this gene.
+	 * @param gene The gene symbol
+	 * @return a List of pgxMarker objects
+	 */
+	public static List<PGXMarker> getMarkerInfo(String gene) throws PGXException, SQLException {
+		return new ArrayList<PGXMarker>(getMarkerInfoMap(gene).values());
 	}
 	
 	
