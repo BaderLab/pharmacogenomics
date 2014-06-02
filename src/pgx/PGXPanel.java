@@ -12,6 +12,7 @@ import java.awt.event.ComponentListener;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.rmi.RemoteException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -21,6 +22,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -48,6 +50,7 @@ import org.ut.biolab.medsavant.shared.appdevapi.DBAnnotationColumns;
 import org.ut.biolab.medsavant.shared.appdevapi.Variant;
 import org.ut.biolab.medsavant.shared.db.TableSchema;
 import org.ut.biolab.medsavant.shared.format.CustomField;
+import org.ut.biolab.medsavant.shared.model.SessionExpiredException;
 import org.ut.biolab.medsavant.shared.serverapi.AnnotationManagerAdapter;
 import pgx.localDB.PGXDBFunctions;
 import pgx.localDB.PGXDBFunctions.PGXMarker;
@@ -65,13 +68,19 @@ public class PGXPanel {
 	private static final String baseDBSNPUrl= "http://www.ncbi.nlm.nih.gov/SNP/snp_ref.cgi?searchType=adhoc_search&rs=";
 	private static final String basePubmedUrl= "http://www.ncbi.nlm.nih.gov/pubmed/";
 	private static final Color DEFAULT_LABEL_COLOUR= (new JTextField()).getForeground();
+	private static final Color DEFAULT_SUBHEADING_DARK_BLUE= new Color(26, 13, 171);
+	private static final String CANCEL_TEXT= "Cancel";
+	private static final String REFRESH_TEXT= "Refresh";
 	
-	private static List<String> afColumnNames;	
+	private static List<String> afColumnNames;
+	
+	private CountDownLatch cancelLatch= new CountDownLatch(1);
 	
 	/* Patient information. */
 	private String currentHospitalID;
 	private String currentDNAID;
-	private PGXAnalysis currentPGXAnalysis;
+	private PGXAnalysis currentPGXAnalysis; // volatile because it's created in another MedSavantWorker thread
+	private MedSavantWorker pgxAnalysisThread;
 	
 	/* UI components. */
 	private JPanel appView;
@@ -85,6 +94,7 @@ public class PGXPanel {
 	private JPanel reportInitJP;
 	private JLabel reportStartLabel;
 	private JCheckBox assumeRefCheckBox;
+	private JButton cancelOrRefresh;
 	
 	
 	public PGXPanel() {
@@ -169,8 +179,83 @@ public class PGXPanel {
 					}
 				}
 				
+				/* Prevent further patient selection while an analysis thread is
+				 * running. */
+				choosePatientButton.setEnabled(false);
+				
 				/* Perform a new pharmacogenomic analysis for this DNA ID. */
 				analyzePatient();
+			}
+		};
+		
+		return outputAL;
+	}
+	
+	
+	/**
+	 * Action to perform when cancel/refresh button is clicked.
+	 * @return the ActionListener for this button
+	 */
+	private ActionListener cancelOrRefreshAction() {
+		// create an anonymous class
+		ActionListener outputAL= new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent ae) {
+				// Check if PGx analysis thread is running or not; could also check
+				// what the button text is, but this is better.
+				
+				if (!pgxAnalysisThread.isDone()) { // cancel action
+				
+				/* If the cancel button is pressed immediately after the analysis
+				 * is started, the analysis is null, and we need to wait for it to
+				 * be initialized before cancelling it. This is done via a CountDownLatch.
+				 * However, the latch is locking, so the swing (UI) thread will
+				 * wait until the analysis is initialized before executing the
+				 * cancel() method. Instead, we'll submit the cancellation request
+				 * via a separate cancellation thread, which will wait for the 
+				 * analysis to be initialized. */
+					MedSavantWorker cancellationThread= new MedSavantWorker<Object>(PGXPanel.class.getCanonicalName()) {			
+						@Override
+						protected Object doInBackground() throws SQLException, RemoteException,
+							SessionExpiredException, PGXException {
+
+								// Intermediate UI updates to show that analysis is being cancelled
+								status.setText("Cancelling...");
+								cancelOrRefresh.setEnabled(false);
+							
+								// Cancel the analysis thread
+								pgxAnalysisThread.cancel(true);
+
+								// Cancel the analysis, once it's been initialized - check
+								// the CountDownLatch first.
+								try {
+									cancelLatch.await();
+									currentPGXAnalysis.cancel();
+								} catch (InterruptedException ie) {
+									errorDialog(ie.getMessage());
+									ie.printStackTrace();
+								}
+								
+							return null;
+						}
+
+						@Override protected void showSuccess(Object t) {
+							// UI cancellation details
+							cancelReportPanel();
+							cancelOrRefresh.setEnabled(true);
+							cancelOrRefresh.setText(REFRESH_TEXT);
+							status.setText("Analysis cancelled.");
+							statusWheel.setVisible(false);
+							choosePatientButton.setEnabled(true);
+						}
+					};
+		
+					// Execute thread
+					cancellationThread.execute();
+					
+				} else { // refresh action
+					analyzePatient();
+				}
 			}
 		};
 		
@@ -210,6 +295,11 @@ public class PGXPanel {
 		assumeRefCheckBox= new JCheckBox("Treat missing markers as Reference calls", true);
 		assumeRefCheckBox.addActionListener(toggleReferenceAction());
 		
+		// Cancel or Refresh button
+		cancelOrRefresh= new JButton();
+		cancelOrRefresh.setVisible(false);
+		cancelOrRefresh.addActionListener(cancelOrRefreshAction());
+		
 		/* Layout notes:
 		 * Create a bit of inset spacing top and left, no space between 
 		 * components unless explicitly specified.
@@ -231,6 +321,7 @@ public class PGXPanel {
 		patientSideJP.add(assumeRefCheckBox, "alignx center, gapy 20px, wrap");
 		patientSideJP.add(status, "alignx center, gapy 50px, wrap");
 		patientSideJP.add(statusWheel, "alignx center, wrap");
+		patientSideJP.add(cancelOrRefresh, "alignx center, wrap");
 		
 		// initialize the scroll pane and set size constraints
 		patientSidePane= new JScrollPane();
@@ -254,12 +345,12 @@ public class PGXPanel {
 		reportStartLabel.setForeground(Color.DARK_GRAY);
 		
 		reportInitJP.setLayout(new MigLayout("align 50% 50%"));
-		reportInitJP.add(reportStartLabel);
-		
+		reportInitJP.add(reportStartLabel);				
+				
 		reportPane= new JScrollPane();
 		reportPane.setBorder(BorderFactory.createEmptyBorder());
 		//reportPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-		reportPane.setViewportView(reportInitJP);
+		reportPane.setViewportView(reportInitJP);		
 		
 		/* NOTE: reportPane size preferences are set upon appView component 
 		 * shown or resizing actions. */
@@ -267,11 +358,20 @@ public class PGXPanel {
 	
 	
 	/**
-	 * Blank report panel to display when a new analysis is being run.
+	 * Report panel to display when a new analysis is being run.
 	 */
-	private void clearReportPanel() {
+	private void analysisRunningReportPanel() {
 		reportStartLabel.setText("Obtaining pharmacogenomic report for " + 
 			this.currentHospitalID + "...");
+		reportPane.setViewportView(reportInitJP);
+	}
+	
+	
+	/**
+	 * Report panel to display when analysis has been cancelled.
+	 */
+	private void cancelReportPanel() {
+		reportStartLabel.setText("Analysis cancelled.");
 		reportPane.setViewportView(reportInitJP);
 	}
 	
@@ -286,27 +386,39 @@ public class PGXPanel {
 		status.setVisible(true);
 		statusWheel.setVisible(true);
 		
+		// Update cancel button
+		cancelOrRefresh.setText(CANCEL_TEXT);
+		cancelOrRefresh.setVisible(true);
+		
 		// Clear the report panel to avoid confusing this patient for the previous one
-		clearReportPanel();
+		analysisRunningReportPanel();
 		
 		/* Background task. */
-		MedSavantWorker pgxAnalysisThread= new MedSavantWorker<Object>(PGXPanel.class.getCanonicalName()) {
+		pgxAnalysisThread= new MedSavantWorker<Object>(PGXPanel.class.getCanonicalName()) {			
 			@Override
-			protected Object doInBackground() throws Exception {
-				/* Create and perform a new analysis. */
+			protected Object doInBackground() throws SQLException, RemoteException,
+				SessionExpiredException, PGXException {
+				
+				/* Create and perform a new analysis. Uses a CountDownLatch to 
+				 * ensure that currentPGXAnalysis is initilized before I can
+				 * do anything with it (for example, cancel it). */
 				try {
 					currentPGXAnalysis= new PGXAnalysis(currentDNAID, assumeRefCheckBox.isSelected());
-				} catch (SQLException se) {
-					errorDialog(se.getMessage());
-					se.printStackTrace();
+					cancelLatch.countDown();
+				} catch (Exception e) {
+					errorDialog(e.getMessage());
+					e.printStackTrace();
 				}
 
 				return null;
 			}
 
-			@Override protected void showSuccess(Object t) {
+			@Override
+			protected void showSuccess(Object t) {
 				status.setText("Analysis complete.");
 				statusWheel.setVisible(false);
+				choosePatientButton.setEnabled(true);
+				cancelOrRefresh.setText(REFRESH_TEXT);
 				
 				/* Update the report pane. */
 				updateReportPane();
@@ -377,7 +489,7 @@ public class PGXPanel {
 			if (!pg.isPhased())
 				phasedTextAddition= "NOT ";
 			reportJP.add(createLabel("Genotypes are " + phasedTextAddition + "phased.",
-				true, 20), "span");
+				false, 22), "span");
 			
 			// No longer implementing the subpanels
 			/* Add a subpanel of tabs. */
@@ -390,20 +502,20 @@ public class PGXPanel {
 			
 			/* Subpanel describing the individual's haplotypes/markers for this individual. */
 			JPanel geneSummaryJP= new JPanel();
-			geneSummaryJP.setLayout(new MigLayout("gapx 20px, insets n 0px n 0px"));
+			geneSummaryJP.setLayout(new MigLayout("gapx 20px"));
 			addHaplotypes(geneSummaryJP, pg);
 			geneSummaryJP.revalidate();
 			//subtabs.addTab(pg.getGene() + " summary", geneSummaryJP);
 			
 			/* Subpanel displaying all detected variants. */
 			JPanel hapDetailsJP= new JPanel();
-			hapDetailsJP.setLayout(new MigLayout("gapx 15px, insets n 0px n 0px"));
+			hapDetailsJP.setLayout(new MigLayout("gapx 15px"));
 			addHaplotypeDetails(hapDetailsJP, pg);
 			//subtabs.addTab("Haplotype details", hapDetailsJP);
 			
 			/* Subpanel describing all the markers tested for this gene. */
 			JPanel testedMarkersJP= new JPanel();
-			testedMarkersJP.setLayout(new MigLayout("gapy 0px, gapx 30px, insets n 0px n 0px")); // don't use fillx property here
+			testedMarkersJP.setLayout(new MigLayout("gapy 0px, gapx 30px")); // don't use fillx property here
 			addTestedMarkers(testedMarkersJP, pg);
 			//subtabs.addTab("Tested markers for " + pg.getGene(), testedMarkersJP); 
 			
@@ -412,8 +524,14 @@ public class PGXPanel {
 			//subtabs.addTab("Novel variants", novelVariantsJP);
 			
 			/* Add subpanels to the main report panel. */
+			reportJP.add(createLabel("Haplotype summary", true, 22,
+				reportJP.getBackground(), DEFAULT_SUBHEADING_DARK_BLUE), "gapy 40px, span");
 			reportJP.add(geneSummaryJP, "span");
+			reportJP.add(createLabel("Genotype summary ", true, 22,
+				reportJP.getBackground(), DEFAULT_SUBHEADING_DARK_BLUE), "span");
 			reportJP.add(hapDetailsJP, "span");
+			reportJP.add(createLabel("Novel variants (not part of guidelines)",
+				true, 22, reportJP.getBackground(), DEFAULT_SUBHEADING_DARK_BLUE), "span");
 			reportJP.add(novelVariantsJP, "span");			
 			
 			/* Add subtabs to the main report panel. */
@@ -539,7 +657,7 @@ public class PGXPanel {
 		
 		/* Subpanel showing all the novel Variants for this gene. */
 		JPanel novelVariantsJP= new JPanel();
-		novelVariantsJP.setLayout(new MigLayout("fillx, gapx 15px, insets n 0px n 0px"));
+		novelVariantsJP.setLayout(new MigLayout("fillx, gapx 15px"));
 		
 		/* Get the names of the allele frequency columns, if not done already. */
 		if (afColumnNames == null) {

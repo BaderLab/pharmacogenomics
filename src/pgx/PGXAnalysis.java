@@ -66,6 +66,8 @@ public class PGXAnalysis {
 	private List<PGXGene> pgxGenes= new LinkedList<PGXGene>();
 	private VariantManagerAdapter vma= MedSavantClient.VariantManager;
 	private boolean assumeRef; // if true, assume reference calls for missing PGx markers
+	private boolean isCancelled= false;
+	
 	
 	/**
 	 * Perform a pharmacogenomic analysis.
@@ -321,6 +323,11 @@ public class PGXAnalysis {
 			
 			/* Add the current gene-variant object to the list. */
 			pgxGenes.add(pgxVariants);
+			
+			/* If analysis has been cancelled, stop querying. */
+			if (isCancelled) {
+				return;
+			}
 		}
 	}
 	
@@ -330,6 +337,11 @@ public class PGXAnalysis {
 	 * @precondition	pgxGenes must already have been initialized by running queryVariants()
 	 */
 	private void getNovelVariants() throws SQLException, RemoteException, SessionExpiredException, PGXException {
+		/* If analysis has been cancelled, stop. */
+		if (isCancelled) {
+			return;
+		}
+		
 		/* Iterate through all previously stored PGXGene objects and get all 
 		 * low allele frequency variants for these genes. */
 		for (PGXGene pg : pgxGenes) {
@@ -374,6 +386,11 @@ public class PGXAnalysis {
 	 * Get diplotypes for all the PGx genes.
 	 */
 	private void getDiplotypes() {
+		/* If analysis has been cancelled, stop. */
+		if (isCancelled) {
+			return;
+		}
+		
 		for (PGXGene pg : pgxGenes) {
 			try {
 				pg.setDiplotype(PGXDBFunctions.getDiplotype(pg, this.assumeRef));
@@ -388,6 +405,11 @@ public class PGXAnalysis {
 	 * Get the haplotype activity scores/phenotypes and metabolizer classes for all PGx genes.
 	 */
 	private void getActivities() {
+		/* If analysis has been cancelled, stop. */
+		if (isCancelled) {
+			return;
+		}
+		
 		for (PGXGene pg : pgxGenes) {
 			/* Set the haplotype activities. */
 			pg.setMaternalActivity(PGXDBFunctions.getActivities(pg.getGene(), pg.getMaternalHaplotype()));
@@ -418,6 +440,23 @@ public class PGXAnalysis {
 		}
 		
 		return dbAliasToNameMap;
+	}
+	
+	
+	/**
+	 * Cancel this PGx analysis.
+	 */
+	public void cancel() {
+		this.isCancelled= true;
+	}
+	
+	
+	/**
+	 * Check cancellation status
+	 * @return true if cancelled, false otherwise
+	 */
+	public boolean isCancelled() {
+		return this.isCancelled;
 	}
 	
 	
