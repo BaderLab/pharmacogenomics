@@ -83,7 +83,7 @@ public class PGXPanel {
 	/* Patient information. */
 	private String currentHospitalID;
 	private String currentDNAID;
-	private PGXAnalysis currentPGXAnalysis; // volatile because it's created in another MedSavantWorker thread
+	private PGXAnalysis currentPGXAnalysis;
 	private MedSavantWorker pgxAnalysisThread;
 	
 	/* UI components. */
@@ -286,7 +286,7 @@ public class PGXPanel {
 				FileNameExtensionFilter filter = new FileNameExtensionFilter("PDF file", "pdf");
 				chooser.setFileFilter(filter);
 				final int chooserValue= chooser.showSaveDialog(MedSavantFrame.getInstance());
-				final String chooserFileName= chooser.getSelectedFile().getPath();
+				final String chooserFileName= chooser.getSelectedFile().getPath() + ".pdf";
 				
 				MedSavantWorker pdfThread= new MedSavantWorker<Object>(PGXPanel.class.getCanonicalName()) {			
 					@Override
@@ -294,10 +294,7 @@ public class PGXPanel {
 						if(chooserValue == JFileChooser.APPROVE_OPTION) {
 							
 							// Create and output the PDF report
-							
-							System.out.println("File: " + chooserFileName); /////////////
 							PGXPDFExporter pdfExporter= new PGXPDFExporter(tabs, chooserFileName);
-							
 							try {
 								pdfExporter.createMultipagePDF();
 							} catch (DocumentException de) {
@@ -412,7 +409,8 @@ public class PGXPanel {
 		reportStartLabel.setForeground(Color.DARK_GRAY);
 		
 		reportInitJP.setLayout(new MigLayout("align 50% 50%"));
-		reportInitJP.add(reportStartLabel);				
+		reportInitJP.setBackground(Color.WHITE);
+		reportInitJP.add(reportStartLabel);
 				
 		reportPane= new JScrollPane();
 		reportPane.setBorder(BorderFactory.createEmptyBorder());
@@ -508,6 +506,7 @@ public class PGXPanel {
 		
 		/* Create a summary tab. */
 		JPanel summary= new JPanel();
+		summary.setBackground(Color.WHITE);
 		summary.setLayout(new MigLayout("gapx 30px"));
 		summary.add(createLabel("Patient Hospital ID", true, 20));
 		summary.add(createLabel(this.currentHospitalID, false, 20), "wrap");
@@ -526,7 +525,11 @@ public class PGXPanel {
 		/* For each PGx gene, create a separate tab. */
 		for (PGXGene pg : currentPGXAnalysis.getGenes()) {
 			JPanel reportJP= new JPanel();
+			reportJP.setBackground(Color.WHITE);
 			reportJP.setLayout(new MigLayout("gapx 30px"));
+			
+			reportJP.add(createLabel("Gene", true, 22));
+			reportJP.add(createLabel(pg.getGene(), false, 22), "wrap");
 			
 			reportJP.add(createLabel("Diplotype", true, 22));
 			reportJP.add(createLabel(pg.getDiplotype(), false, 22), "wrap");
@@ -572,6 +575,7 @@ public class PGXPanel {
 			
 			/* Subpanel describing the individual's haplotypes/markers for this individual. */
 			JPanel geneSummaryJP= new JPanel();
+			geneSummaryJP.setBackground(Color.WHITE);
 			geneSummaryJP.setLayout(new MigLayout("gapx 20px"));
 			addHaplotypes(geneSummaryJP, pg);
 			geneSummaryJP.revalidate();
@@ -579,12 +583,14 @@ public class PGXPanel {
 			
 			/* Subpanel displaying all detected variants. */
 			JPanel hapDetailsJP= new JPanel();
+			hapDetailsJP.setBackground(Color.WHITE);
 			hapDetailsJP.setLayout(new MigLayout("gapx 15px"));
 			addHaplotypeDetails(hapDetailsJP, pg);
 			//subtabs.addTab("Haplotype details", hapDetailsJP);
 			
 			/* Subpanel describing all the markers tested for this gene. */
 			JPanel testedMarkersJP= new JPanel();
+			testedMarkersJP.setBackground(Color.WHITE);
 			testedMarkersJP.setLayout(new MigLayout("gapy 0px, gapx 30px")); // don't use fillx property here
 			addTestedMarkers(testedMarkersJP, pg);
 			//subtabs.addTab("Tested markers for " + pg.getGene(), testedMarkersJP); 
@@ -727,6 +733,7 @@ public class PGXPanel {
 		
 		/* Subpanel showing all the novel Variants for this gene. */
 		JPanel novelVariantsJP= new JPanel();
+		novelVariantsJP.setBackground(Color.WHITE);
 		novelVariantsJP.setLayout(new MigLayout("fillx, gapx 15px"));
 		
 		/* Get the names of the allele frequency columns, if not done already. */
