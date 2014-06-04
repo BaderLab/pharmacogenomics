@@ -1,5 +1,6 @@
 package pgx;
 
+import com.itextpdf.text.DocumentException;
 import com.jidesoft.swing.ButtonStyle;
 import com.jidesoft.swing.JideButton;
 import java.awt.Color;
@@ -27,12 +28,14 @@ import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComponent;
+import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextField;
 import javax.swing.ScrollPaneConstants;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import net.miginfocom.swing.MigLayout;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -40,6 +43,7 @@ import org.ut.biolab.medsavant.MedSavantClient;
 import org.ut.biolab.medsavant.client.project.ProjectController;
 import org.ut.biolab.medsavant.client.util.ClientMiscUtils;
 import org.ut.biolab.medsavant.client.util.MedSavantWorker;
+import org.ut.biolab.medsavant.client.view.MedSavantFrame;
 import org.ut.biolab.medsavant.client.view.component.ProgressWheel;
 import org.ut.biolab.medsavant.client.view.dialog.IndividualSelector;
 import org.ut.biolab.medsavant.client.view.login.LoginController;
@@ -95,6 +99,8 @@ public class PGXPanel {
 	private JLabel reportStartLabel;
 	private JCheckBox assumeRefCheckBox;
 	private JButton cancelOrRefresh;
+	private JButton exportToPDFButton;
+	private JTabbedPane tabs;
 	
 	
 	public PGXPanel() {
@@ -264,6 +270,61 @@ public class PGXPanel {
 	
 	
 	/**
+	 * Action to perform when export to PDF button is clicked.
+	 * @return the ActionListener for this button
+	 */
+	private ActionListener exportToPDFAction() {
+		// create an anonymous class
+		ActionListener outputAL= new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent ae) {
+				status.setText("Exporting PDF...");
+				statusWheel.setVisible(true);
+				
+				// Get the user's desired filename
+				JFileChooser chooser = new JFileChooser();
+				FileNameExtensionFilter filter = new FileNameExtensionFilter("PDF file", "pdf");
+				chooser.setFileFilter(filter);
+				final int chooserValue= chooser.showSaveDialog(MedSavantFrame.getInstance());
+				final String chooserFileName= chooser.getSelectedFile().getPath();
+				
+				MedSavantWorker pdfThread= new MedSavantWorker<Object>(PGXPanel.class.getCanonicalName()) {			
+					@Override
+					protected Object doInBackground() {						
+						if(chooserValue == JFileChooser.APPROVE_OPTION) {
+							
+							// Create and output the PDF report
+							
+							System.out.println("File: " + chooserFileName); /////////////
+							PGXPDFExporter pdfExporter= new PGXPDFExporter(tabs, chooserFileName);
+							
+							try {
+								pdfExporter.createMultipagePDF();
+							} catch (DocumentException de) {
+								errorDialog("Error producing PDF report: " + de.getMessage());
+								de.printStackTrace();
+							}
+						}
+						
+						return null;
+					}
+
+					@Override protected void showSuccess(Object t) {
+						status.setText("PDF export complete.");
+						statusWheel.setVisible(false);
+					}
+				};
+
+				// Execute thread
+				pdfThread.execute();
+			}
+		};
+		
+		return outputAL;
+	}
+	
+	
+	/**
 	 * Initialize the patient side panel.
 	 */
 	private void initPatientSidePanel() {		
@@ -300,6 +361,11 @@ public class PGXPanel {
 		cancelOrRefresh.setVisible(false);
 		cancelOrRefresh.addActionListener(cancelOrRefreshAction());
 		
+		// Export to PDF button
+		exportToPDFButton= new JButton("Export to PDF");
+		exportToPDFButton.setVisible(false);
+		exportToPDFButton.addActionListener(exportToPDFAction());
+		
 		/* Layout notes:
 		 * Create a bit of inset spacing top and left, no space between 
 		 * components unless explicitly specified.
@@ -322,6 +388,7 @@ public class PGXPanel {
 		patientSideJP.add(status, "alignx center, gapy 50px, wrap");
 		patientSideJP.add(statusWheel, "alignx center, wrap");
 		patientSideJP.add(cancelOrRefresh, "alignx center, wrap");
+		patientSideJP.add(exportToPDFButton, "alignx center, gapy 40px, wrap");
 		
 		// initialize the scroll pane and set size constraints
 		patientSidePane= new JScrollPane();
@@ -390,6 +457,8 @@ public class PGXPanel {
 		cancelOrRefresh.setText(CANCEL_TEXT);
 		cancelOrRefresh.setVisible(true);
 		
+		exportToPDFButton.setVisible(false);
+		
 		// Clear the report panel to avoid confusing this patient for the previous one
 		analysisRunningReportPanel();
 		
@@ -419,6 +488,7 @@ public class PGXPanel {
 				statusWheel.setVisible(false);
 				choosePatientButton.setEnabled(true);
 				cancelOrRefresh.setText(REFRESH_TEXT);
+				exportToPDFButton.setVisible(true);
 				
 				/* Update the report pane. */
 				updateReportPane();
@@ -434,7 +504,7 @@ public class PGXPanel {
 	 * Update the report panel.
 	 */
 	private void updateReportPane() {
-		JTabbedPane tabs= ViewUtil.getMSTabedPane();
+		tabs= ViewUtil.getMSTabedPane();
 		
 		/* Create a summary tab. */
 		JPanel summary= new JPanel();
