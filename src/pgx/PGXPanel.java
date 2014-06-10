@@ -1,6 +1,7 @@
 package pgx;
 
 import com.itextpdf.text.DocumentException;
+import com.jidesoft.pane.CollapsiblePane;
 import com.jidesoft.swing.ButtonStyle;
 import com.jidesoft.swing.JideButton;
 import java.awt.Color;
@@ -33,6 +34,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -363,6 +365,22 @@ public class PGXPanel {
 		exportToPDFButton.setVisible(false);
 		exportToPDFButton.addActionListener(exportToPDFAction());
 		
+		// Create the disclaimer collapsible pane
+		CollapsiblePane disclaimer= new CollapsiblePane("Disclaimer");
+		disclaimer.setStyle(CollapsiblePane.PLAIN_STYLE);
+		disclaimer.collapse(true);
+		disclaimer.setFocusable(false); // no focus box drawn around panel title
+		
+		JTextArea disclaimerTextArea= new JTextArea(PGXDisclaimer.getDisclaimer());
+		disclaimerTextArea.setLineWrap(true);
+		disclaimerTextArea.setWrapStyleWord(true); // wrap text at word boundaries
+		disclaimerTextArea.setRows(8);
+		disclaimerTextArea.setColumns(27);
+		
+		JScrollPane disclaimerJSP= new JScrollPane();
+		disclaimerJSP.setViewportView(disclaimerTextArea);
+		disclaimer.add(disclaimerJSP, "alignx center, wrap");
+		
 		/* Layout notes:
 		 * Create a bit of inset spacing top and left, no space between 
 		 * components unless explicitly specified.
@@ -371,7 +389,7 @@ public class PGXPanel {
 		 * button, when you centre it, it won't be centred in the panel unless
 		 * you have a full-panel-width component below/above it. I'm specifying 
 		 * "fillx" for the layout to solve this issue. */
-		patientSideJP.setLayout(new MigLayout("insets 10 10 0 0, gapy 0px, fillx"));
+		patientSideJP.setLayout(new MigLayout("insets 10 10 0 0, gapy 0px, fill"));
 		//patientSideJP.setBackground(ViewUtil.getSidebarColor());
 		patientSideJP.setBackground(AppColors.HummingBird);
 		// Add a light border only on the right side.
@@ -379,13 +397,14 @@ public class PGXPanel {
 		patientSideJP.setMinimumSize(new Dimension(SIDE_PANE_WIDTH, 0)); // minimum width for panel
 		
 		patientSideJP.add(choosePatientButton, "alignx center, wrap");
-		patientSideJP.add(new JLabel("This app uses the CPIC guidelines"), "alignx center, gapy 20px, wrap");
-		patientSideJP.add(new JLabel("BETA TESTING!!!"), "alignx center, gapy 20px, wrap");
+		patientSideJP.add(new JLabel("Results are based on CPIC guidelines"), "alignx center, gapy 20px, wrap");
+		patientSideJP.add(new JLabel("This app is intended for research purposes only"), "alignx center, gapy 10px, wrap");
 		patientSideJP.add(assumeRefCheckBox, "alignx center, gapy 20px, wrap");
 		patientSideJP.add(status, "alignx center, gapy 50px, wrap");
 		patientSideJP.add(statusWheel, "alignx center, wrap");
-		patientSideJP.add(cancelOrRefresh, "alignx center, wrap");
+		patientSideJP.add(cancelOrRefresh, "alignx center, gapy 20px, wrap");
 		patientSideJP.add(exportToPDFButton, "alignx center, gapy 40px, wrap");
+		patientSideJP.add(disclaimer, "dock south");
 		
 		// initialize the scroll pane and set size constraints
 		patientSidePane= new JScrollPane();
@@ -403,13 +422,13 @@ public class PGXPanel {
 	 */
 	private void initReportPanel() {
 		reportInitJP= new JPanel();
-		reportStartLabel= new JLabel("Choose a patient to start a pharmacogenomic analysis.");
-		
-		reportStartLabel.setFont(new Font(reportStartLabel.getFont().getName(), Font.PLAIN, 14));
-		reportStartLabel.setForeground(Color.DARK_GRAY);
-		
 		reportInitJP.setLayout(new MigLayout("align 50% 50%"));
 		reportInitJP.setBackground(Color.WHITE);
+		
+		reportStartLabel= new JLabel("Choose a patient to start a pharmacogenomic analysis.");
+		reportStartLabel.setFont(new Font(reportStartLabel.getFont().getName(), Font.PLAIN, 14));
+		reportStartLabel.setForeground(Color.DARK_GRAY);		
+		
 		reportInitJP.add(reportStartLabel);
 				
 		reportPane= new JScrollPane();
