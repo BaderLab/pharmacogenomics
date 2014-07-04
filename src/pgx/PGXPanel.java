@@ -11,6 +11,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
+import java.io.FileNotFoundException;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -103,6 +104,7 @@ public class PGXPanel {
 	private JButton cancelOrRefresh;
 	private JButton exportToPDFButton;
 	private JTabbedPane tabs;
+	private JButton exportToTextButton;
 	
 	
 	public PGXPanel() {
@@ -284,16 +286,17 @@ public class PGXPanel {
 				statusWheel.setVisible(true);
 				
 				// Get the user's desired filename
-				JFileChooser chooser = new JFileChooser();
+				final JFileChooser chooser = new JFileChooser();
 				FileNameExtensionFilter filter = new FileNameExtensionFilter("PDF file", "pdf");
 				chooser.setFileFilter(filter);
 				final int chooserValue= chooser.showSaveDialog(MedSavantFrame.getInstance());
-				final String chooserFileName= chooser.getSelectedFile().getPath() + ".pdf";
 				
 				MedSavantWorker pdfThread= new MedSavantWorker<Object>(PGXPanel.class.getCanonicalName()) {			
 					@Override
 					protected Object doInBackground() {						
 						if(chooserValue == JFileChooser.APPROVE_OPTION) {
+							// only create the file if the approve button ("ok" rather than "cancel") has been clicked
+							final String chooserFileName= chooser.getSelectedFile().getPath() + ".pdf";
 							
 							// Create and output the PDF report
 							PGXPDFExporter pdfExporter= new PGXPDFExporter(tabs, chooserFileName);
@@ -316,6 +319,59 @@ public class PGXPanel {
 
 				// Execute thread
 				pdfThread.execute();
+			}
+		};
+		
+		return outputAL;
+	}
+	
+	
+	/**
+	 * Action to perform when export to text button is clicked.
+	 * @return the ActionListener for this button
+	 */
+	private ActionListener exportToTextAction() {
+		// create an anonymous class
+		ActionListener outputAL= new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent ae) {
+				status.setText("Exporting text file...");
+				statusWheel.setVisible(true);
+				
+				// Get the user's desired filename
+				final JFileChooser chooser = new JFileChooser();
+				FileNameExtensionFilter filter = new FileNameExtensionFilter("Text file", "txt");
+				chooser.setFileFilter(filter);
+				final int chooserValue= chooser.showSaveDialog(MedSavantFrame.getInstance());
+				
+				MedSavantWorker textFileThread= new MedSavantWorker<Object>(PGXPanel.class.getCanonicalName()) {			
+					@Override
+					protected Object doInBackground() {					
+						// only create the file if the approve button ("ok" rather than "cancel") has been clicked
+						if(chooserValue == JFileChooser.APPROVE_OPTION) {
+							String chooserFileName= chooser.getSelectedFile().getPath() + ".txt";
+							
+							// Create and output the PDF report
+							PGXTextExporter textExporter= new PGXTextExporter(currentPGXAnalysis, chooserFileName);
+							try {
+								textExporter.createTextReport();
+							} catch (FileNotFoundException fnfe) {
+								errorDialog("Error producing text report: " + fnfe.getMessage());
+								fnfe.printStackTrace();
+							}
+						}
+						
+						return null;
+					}
+
+					@Override protected void showSuccess(Object t) {
+						status.setText("Text file export complete.");
+						statusWheel.setVisible(false);
+					}
+				};
+
+				// Execute thread
+				textFileThread.execute();
 			}
 		};
 		
@@ -365,6 +421,11 @@ public class PGXPanel {
 		exportToPDFButton.setVisible(false);
 		exportToPDFButton.addActionListener(exportToPDFAction());
 		
+		// Export to text button
+		exportToTextButton= new JButton("Export to text file");
+		exportToTextButton.setVisible(false);
+		exportToTextButton.addActionListener(exportToTextAction());
+		
 		// Create the disclaimer collapsible pane
 		CollapsiblePane disclaimer= new CollapsiblePane("Disclaimer");
 		disclaimer.setStyle(CollapsiblePane.PLAIN_STYLE);
@@ -404,6 +465,7 @@ public class PGXPanel {
 		patientSideJP.add(statusWheel, "alignx center, wrap");
 		patientSideJP.add(cancelOrRefresh, "alignx center, gapy 20px, wrap");
 		patientSideJP.add(exportToPDFButton, "alignx center, gapy 40px, wrap");
+		patientSideJP.add(exportToTextButton, "alignx center, wrap");
 		patientSideJP.add(disclaimer, "dock south");
 		
 		// initialize the scroll pane and set size constraints
@@ -475,6 +537,7 @@ public class PGXPanel {
 		cancelOrRefresh.setVisible(true);
 		
 		exportToPDFButton.setVisible(false);
+		exportToTextButton.setVisible(false);
 		
 		// Clear the report panel to avoid confusing this patient for the previous one
 		analysisRunningReportPanel();
@@ -506,6 +569,7 @@ public class PGXPanel {
 				choosePatientButton.setEnabled(true);
 				cancelOrRefresh.setText(REFRESH_TEXT);
 				exportToPDFButton.setVisible(true);
+				exportToTextButton.setVisible(true);
 				
 				/* Update the report pane. */
 				updateReportPane();
@@ -682,7 +746,8 @@ public class PGXPanel {
 		jp.add(createLabel("Chr", true, FONT_SIZE));
 		jp.add(createLabel("Position", true, FONT_SIZE));
 		jp.add(createLabel("Ref", true, FONT_SIZE));
-		jp.add(createLabel("Alt", true, FONT_SIZE), "wrap");
+		jp.add(createLabel("Alt", true, FONT_SIZE));
+		jp.add(createLabel("Coverage", true, FONT_SIZE), "wrap");
 		
 		Map<String, PGXMarker> markerLookup= new HashMap<String, PGXMarker>();
 		try {
@@ -700,7 +765,7 @@ public class PGXPanel {
 		for (String rsID : allRsIDs) {
 			PGXGenotype genotype1= hap1Genotypes.get(rsID);
 			PGXGenotype genotype2= hap2Genotypes.get(rsID);
-
+			
 			String genotypeStatus= "observed";
 			Color fontColour= AppColors.Salem;
 			if (genotype1.getInferredStatus() || genotype2.getInferredStatus()) {
@@ -720,7 +785,8 @@ public class PGXPanel {
 			jp.add(createLabel(markerLookup.get(rsID).chromosome, false, FONT_SIZE, jp.getBackground(), fontColour));
 			jp.add(createLabel(markerLookup.get(rsID).position, false, FONT_SIZE, jp.getBackground(), fontColour));
 			jp.add(createLabel(markerLookup.get(rsID).ref, false, FONT_SIZE, jp.getBackground(), fontColour));
-			jp.add(createLabel(markerLookup.get(rsID).alt, false, FONT_SIZE, jp.getBackground(), fontColour), "wrap");
+			jp.add(createLabel(markerLookup.get(rsID).alt, false, FONT_SIZE, jp.getBackground(), fontColour));
+			jp.add(createLabel(Integer.toString(genotype1.getCoverage()), false, FONT_SIZE, jp.getBackground(), fontColour), "wrap");
 		}
 	}
 	

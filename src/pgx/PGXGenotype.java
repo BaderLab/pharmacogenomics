@@ -11,16 +11,24 @@ public class PGXGenotype {
 	
 	private String genotype;
 	private boolean isInferred;
+	private int coverage= 0;
 	
 	
 	/**
 	 * Create the genotype.
 	 * @param genotype The genotype String
 	 * @param isInferred true if inferred, false if measured directly from seq output
+	 * @param coverage the sequence coverage for this genotype observation
 	 */
-	public PGXGenotype(String genotype, boolean isInferred) {
+	public PGXGenotype(String genotype, boolean isInferred, int coverage) {
 		this.genotype= genotype;
 		this.isInferred= isInferred;
+		
+		// Only accept coverage that is initialized. Coverage == -1 indicates
+		// coverage is absent from the VCF (for example, from array data).
+		if (coverage > 0) {
+			this.coverage= coverage;
+		}
 	}
 	
 	
@@ -39,5 +47,14 @@ public class PGXGenotype {
 	 */
 	public boolean getInferredStatus() {
 		return this.isInferred;
+	}
+	
+	
+	/**
+	 * Get the sequence coverage for this genotype
+	 * @return the sequence coverage for this genotype
+	 */
+	public int getCoverage() {
+		return this.coverage;
 	}
 }

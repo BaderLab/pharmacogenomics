@@ -155,8 +155,10 @@ public class PGXDBFunctions {
 				String[] refAndAlts= variantMap.get(key);
 				//String currentRsID= (String) v.getColumn(DBAnnotationColumns.DBSNP_TEXT); // creates nulls sometimes, leading to errors.
 				String currentRsID= getMarkerID(v);
-				maternalGenotypes.put(currentRsID, new PGXGenotype(refAndAlts[maternalGT], false));
-				paternalGenotypes.put(currentRsID, new PGXGenotype(refAndAlts[paternalGT], false));
+				int totalDepthOfCoverage= v.getReferenceDepth() + v.getAlternateDepth();
+				
+				maternalGenotypes.put(currentRsID, new PGXGenotype(refAndAlts[maternalGT], false, totalDepthOfCoverage));
+				paternalGenotypes.put(currentRsID, new PGXGenotype(refAndAlts[paternalGT], false, totalDepthOfCoverage));
 			} catch (NumberFormatException nfe) {
 				continue; // Do not add this genotype for this individual because it's missing; happens with GT = "./."
 			}
@@ -276,7 +278,7 @@ public class PGXDBFunctions {
 				sql +=	"	AND marker_info LIKE '%" + marker + "=" + markerRef.get(marker) +"%' ";
 				
 				// Add this marker to the list of inferred markers for this haplotype
-				markerGenotypePairs.put(marker, new PGXGenotype(markerRef.get(marker), true));
+				markerGenotypePairs.put(marker, new PGXGenotype(markerRef.get(marker), true, 0));
 			}
 				
 		}		
@@ -325,7 +327,7 @@ public class PGXDBFunctions {
 				markerRef.containsKey(marker)) { // some markers don't have a ref call, ignore for now
 				
 				// Add this marker to the list of inferred markers for this haplotype
-				markerGenotypePairs.put(marker, new PGXGenotype(markerRef.get(marker), true));
+				markerGenotypePairs.put(marker, new PGXGenotype(markerRef.get(marker), true, 0));
 			}
 				
 		}		
