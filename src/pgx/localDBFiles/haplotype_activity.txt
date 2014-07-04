@@ -111,7 +111,16 @@ DPYD	*9B		decreased	23988873
 DPYD	*10		decreased	23988873
 DPYD	*11		decreased	23988873
 DPYD	*12		decreased	23988873
-CFTR	G551D		normal	24598717
-CFTR	Reference		no activity	24598717
 IFNL3	Reference		normal	24096968
 IFNL3	rs12979860		decreased	24096968
+CFTR	Reference		nonresponsive	24598717
+CFTR	G551D		responsive	24598717
+CFTR	F508delCTT		nonresponsive	24598717
+CFTR	F508delTCT		nonresponsive	24598717
+CFTR	G1244E		responsive	24598717
+CFTR	G1349D		responsive	24598717
+CFTR	G178R		responsive	24598717
+CFTR	G551S		responsive	24598717
+CFTR	S1251N		responsive	24598717
+CFTR	S549RTtoG		responsive	24598717
+CFTR	S549RAtoC		responsive	24598717

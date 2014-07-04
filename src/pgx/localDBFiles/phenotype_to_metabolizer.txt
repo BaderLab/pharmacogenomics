@@ -9,3 +9,6 @@ normal	no activity	Intermediate
 decreased	decreased	Poor
 decreased	no activity	Poor
 no activity	no activity	Poor
+responsive	responsive	Responsive
+responsive	nonresponsive	Responsive
+nonresponsive	nonresponsive	Non-responsive
