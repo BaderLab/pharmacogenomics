@@ -100,7 +100,6 @@ public class PGXPanel {
 	private ProgressWheel statusWheel;
 	private JPanel reportInitJP;
 	private JLabel reportStartLabel;
-	private JCheckBox assumeRefCheckBox;
 	private JButton cancelOrRefresh;
 	private JButton exportToPDFButton;
 	private JTabbedPane tabs;
@@ -407,10 +406,6 @@ public class PGXPanel {
 		status.setVisible(false);
 		statusWheel.setVisible(false);
 		
-		// Checkbox governing assumptions about missing markers
-		assumeRefCheckBox= new JCheckBox("Treat missing markers as Reference calls", true);
-		assumeRefCheckBox.addActionListener(toggleReferenceAction());
-		
 		// Cancel or Refresh button
 		cancelOrRefresh= new JButton();
 		cancelOrRefresh.setVisible(false);
@@ -460,7 +455,6 @@ public class PGXPanel {
 		patientSideJP.add(choosePatientButton, "alignx center, wrap");
 		patientSideJP.add(new JLabel("Results are based on CPIC guidelines"), "alignx center, gapy 20px, wrap");
 		patientSideJP.add(new JLabel("This app is intended for research purposes only"), "alignx center, gapy 10px, wrap");
-		patientSideJP.add(assumeRefCheckBox, "alignx center, gapy 20px, wrap");
 		patientSideJP.add(status, "alignx center, gapy 50px, wrap");
 		patientSideJP.add(statusWheel, "alignx center, wrap");
 		patientSideJP.add(cancelOrRefresh, "alignx center, gapy 20px, wrap");
@@ -552,7 +546,7 @@ public class PGXPanel {
 				 * ensure that currentPGXAnalysis is initilized before I can
 				 * do anything with it (for example, cancel it). */
 				try {
-					currentPGXAnalysis= new PGXAnalysis(currentDNAID, assumeRefCheckBox.isSelected());
+					currentPGXAnalysis= new PGXAnalysis(currentDNAID);
 					cancelLatch.countDown();
 				} catch (Exception e) {
 					errorDialog(e.getMessage());
@@ -742,7 +736,7 @@ public class PGXPanel {
 		jp.add(createLabel("Marker ID", true, FONT_SIZE));
 		jp.add(createLabel(column1Heading, true, FONT_SIZE));
 		jp.add(createLabel(column2Heading, true, FONT_SIZE));
-		jp.add(createLabel("Observed/Inferred genotype", true, FONT_SIZE));
+		jp.add(createLabel("Observed status", true, FONT_SIZE));
 		jp.add(createLabel("Chr", true, FONT_SIZE));
 		jp.add(createLabel("Position", true, FONT_SIZE));
 		jp.add(createLabel("Ref", true, FONT_SIZE));
@@ -756,29 +750,39 @@ public class PGXPanel {
 			errorDialog(e.getMessage());
 			e.printStackTrace();
 		}
+		List<String> allRsIDs= new ArrayList<String>(markerLookup.keySet());
+		Collections.sort(allRsIDs); // sort the list of markers
 		
 		Map<String, PGXGenotype> hap1Genotypes= pg.getMaternalGenotypes();
 		Map<String, PGXGenotype> hap2Genotypes= pg.getPaternalGenotypes();
-		// Haplotype 1 and 2 have the same marker IDs
-		List<String> allRsIDs= new ArrayList<String>(hap1Genotypes.keySet());
-		Collections.sort(allRsIDs); // sort the list of markers
+		
 		for (String rsID : allRsIDs) {
-			PGXGenotype genotype1= hap1Genotypes.get(rsID);
-			PGXGenotype genotype2= hap2Genotypes.get(rsID);
-			
 			String genotypeStatus= "observed";
-			Color fontColour= AppColors.Salem;
-			if (genotype1.getInferredStatus() || genotype2.getInferredStatus()) {
-				genotypeStatus= "inferred as reference";
-				fontColour= DEFAULT_LABEL_COLOUR;
+			PGXGenotype genotype1= null;
+			PGXGenotype genotype2= null;
+			String haplotypeGenotype1= "N/A";
+			String haplotypeGenotype2= "N/A";
+			String coverage= "N/A";
+			Color fontColour= DEFAULT_LABEL_COLOUR;
+			// hap1Genotypes and hap2Genotypes have the same keys, check only one
+			if (hap1Genotypes.containsKey(rsID)) {
+				genotype1= hap1Genotypes.get(rsID);
+				genotype2= hap2Genotypes.get(rsID);
+				
+				haplotypeGenotype1= genotype1.getGenotype();
+				haplotypeGenotype2= genotype2.getGenotype();
+				coverage= Integer.toString(genotype1.getCoverage());
+			} else {
+				genotypeStatus= "missing";
+				fontColour= Color.RED;
 			}
 			
 			JButton markerURLButton= getURLButton(rsID, baseDBSNPUrl, rsID, false);
 			markerURLButton.setFont(new Font(markerURLButton.getFont().getName(), Font.PLAIN, FONT_SIZE));
 			markerURLButton.setForeground(fontColour);
 			jp.add(markerURLButton);
-			jp.add(createLabel(genotype1.getGenotype(), false, FONT_SIZE, jp.getBackground(), fontColour));
-			jp.add(createLabel(genotype2.getGenotype(), false, FONT_SIZE, jp.getBackground(), fontColour));
+			jp.add(createLabel(haplotypeGenotype1, false, FONT_SIZE, jp.getBackground(), fontColour));
+			jp.add(createLabel(haplotypeGenotype2, false, FONT_SIZE, jp.getBackground(), fontColour));
 			jp.add(createLabel(genotypeStatus, false, FONT_SIZE, jp.getBackground(), fontColour));
 			// NOTE: All markers MUST be in the markerlookup map, so not checking
 			// for rsID presence as a key.
@@ -786,7 +790,7 @@ public class PGXPanel {
 			jp.add(createLabel(markerLookup.get(rsID).position, false, FONT_SIZE, jp.getBackground(), fontColour));
 			jp.add(createLabel(markerLookup.get(rsID).ref, false, FONT_SIZE, jp.getBackground(), fontColour));
 			jp.add(createLabel(markerLookup.get(rsID).alt, false, FONT_SIZE, jp.getBackground(), fontColour));
-			jp.add(createLabel(Integer.toString(genotype1.getCoverage()), false, FONT_SIZE, jp.getBackground(), fontColour), "wrap");
+			jp.add(createLabel(coverage, false, FONT_SIZE, jp.getBackground(), fontColour), "wrap");
 		}
 	}
 	

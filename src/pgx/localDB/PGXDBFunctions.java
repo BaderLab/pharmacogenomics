@@ -179,13 +179,12 @@ public class PGXDBFunctions {
 	/**
 	 * Return a string of the diplotype for this gene-variants pair using star (*) nomenclature.
 	 * @param pg the gene-variants pair object
-	 * @param assumeRef if true and a marker is missing, assumes reference nucleotide. If false, marker is left blank.
 	 * @return a String of the diplotype in the form "*1/*17" NOT with the gene
 	 *	like "CYP2C19*1/*17"; "unknown" if this gene has no * diplotypes or if 
 	 *  the genotypes are unphased.
 	 */
-	public static String getDiplotype(PGXGene pg, boolean assumeRef) throws PGXException, SQLException {	
-		String diplotype= "unknown";
+	public static String getDiplotype(PGXGene pg) throws PGXException, SQLException {	
+		String diplotype= "UNKNOWN";
 		
 		/* Assign the phased parental genotypes to be used for haplotype translation. */
 		assignParentalGenotypes(pg);
@@ -196,13 +195,12 @@ public class PGXDBFunctions {
 		Map<String, PGXGenotype> maternalGenotypes= pg.getMaternalGenotypes();
 		Map<String, PGXGenotype> paternalGenotypes= pg.getPaternalGenotypes();
 		
-		/* Get haplotypes if genotypes are phased, otherwise, add the reference
-		 * calls to the PGXGene if assumeRef is true. */
+		/* Get haplotypes if genotypes are phased. */
 		if (pg.isPhased()) {		
 			/* Get the haplotypes and check for novel ones (ie. no match found).
 			 * If a haplotype is novel, output "UNKNOWN" and then append the most
 			 * similar haplotype. */
-			pg.setMaternalHaplotype(getHaplotype(pg.getGene(), maternalGenotypes, assumeRef));
+			pg.setMaternalHaplotype(getHaplotype(pg.getGene(), maternalGenotypes));
 			String maternalHaplotype= new String(pg.getMaternalHaplotype()); // create a copy, since we're going to modify the string
 			if (maternalHaplotype.equals(UNKNOWN_HAPLOTYPE)) {
 				List<String> maternalSimilar= getSimilarHaplotypes(
@@ -212,7 +210,7 @@ public class PGXDBFunctions {
 				}
 			}
 
-			pg.setPaternalHaplotype(getHaplotype(pg.getGene(), paternalGenotypes, assumeRef));
+			pg.setPaternalHaplotype(getHaplotype(pg.getGene(), paternalGenotypes));
 			String paternalHaplotype= new String(pg.getPaternalHaplotype()); // create a copy, since we're going to modify the string
 			if (paternalHaplotype.equals(UNKNOWN_HAPLOTYPE)) {
 				List<String> paternalSimilar= getSimilarHaplotypes(
@@ -227,12 +225,8 @@ public class PGXDBFunctions {
 			List<String> haplotypes= new ArrayList<String>();
 			haplotypes.add(maternalHaplotype);
 			haplotypes.add(paternalHaplotype);
-			Collections.sort(haplotypes, new NaturalOrderComparator());			
+			Collections.sort(haplotypes, new NaturalOrderComparator());
 			diplotype= haplotypes.get(0) + "/" + haplotypes.get(1);
-		} else if (!pg.isPhased() && assumeRef) {
-			// Assign reference genotypes if they're missing.
-			assignReferenceGenotypes(pg.getGene(), maternalGenotypes);
-			assignReferenceGenotypes(pg.getGene(), paternalGenotypes);
 		}
 		
 		return diplotype;
@@ -243,12 +237,65 @@ public class PGXDBFunctions {
 	 * Convert marker-genotype pairs into a * nomenclature haplotype for this gene.
 	 * @param gene the gene name/symbol
 	 * @param markerGenotypePairs a hash of marker-genotype pairs
+	 * @return a string representing the * nomenclature haplotype for this hash, empty string if no haplotype found
+	 * @throws PGXException
+	 * @throws SQLException 
+	 */
+	private static String getHaplotype(String gene, Map<String, PGXGenotype> markerGenotypePairs)
+		throws PGXException, SQLException {
+		
+		Map<String, String> markerRef= getMarkerRefMap(gene);
+		
+		String sql=	"SELECT H.haplotype_symbol " +
+					"FROM haplotype_markers H " +
+					"WHERE gene = '" + gene + "' ";
+		
+		/* Iterate over the markers and construct a query for the local DB.
+		 * Marker order doesn't affect the query. */
+		for (String marker : getMarkers(gene)) {
+			
+			/* If the marker was found, use the reported variant call, otherwise
+			 * marker is missing. */
+			if (markerGenotypePairs.containsKey(marker)) {
+				sql +=	"	AND marker_info LIKE '%" + marker + "=" + markerGenotypePairs.get(marker).getGenotype() +"%' ";
+			}
+				
+		}		
+		
+		/* Get all * alleles that can be retrieved with this query (>= 1). */
+		List<String> allPossibleAlleles= new ArrayList<String>();
+		try {
+			ResultSet rs= PGXDB.executeQuery(sql);
+			
+			while (rs.next()) {
+				// only grab the first column because we're only SELECTing it
+				// above in the SQL statement
+				allPossibleAlleles.add((String) PGXDB.getRowAsList(rs).get(0));
+			}
+		} catch (SQLException se) {
+			se.printStackTrace();
+		}
+		
+		/* Sort the list of haplotypes naturally/lexicographically. */
+		Collections.sort(allPossibleAlleles, new NaturalOrderComparator());
+		String haplotype= StringUtils.join(allPossibleAlleles, ',');
+		if (haplotype.equals(""))
+			haplotype= UNKNOWN_HAPLOTYPE;
+		
+		return haplotype;
+	}
+	
+	
+	/**
+	 * Convert marker-genotype pairs into a * nomenclature haplotype for this gene with optional inference.
+	 * @param gene the gene name/symbol
+	 * @param markerGenotypePairs a hash of marker-genotype pairs
 	 * @param assumeRef if true and a marker is missing, assumes reference nucleotide. If false, marker is left blank.
 	 * @return a string representing the * nomenclature haplotype for this hash, empty string if no haplotype found
 	 * @throws PGXException
 	 * @throws SQLException 
 	 */
-	private static String getHaplotype(String gene, Map<String, PGXGenotype> markerGenotypePairs, boolean assumeRef)
+	private static String getHaplotypeWithAssumption(String gene, Map<String, PGXGenotype> markerGenotypePairs, boolean assumeRef)
 		throws PGXException, SQLException {
 		
 		Map<String, String> markerRef= getMarkerRefMap(gene);
@@ -610,7 +657,7 @@ public class PGXDBFunctions {
 	
 	
 	/**
-	 * Return a list of all PGx markers, for this gene.
+	 * Return a map of all PGx markers, for this gene.
 	 * @param gene The gene symbol
 	 * @return a Map of PGXMarker objects keyed by markerID
 	 */

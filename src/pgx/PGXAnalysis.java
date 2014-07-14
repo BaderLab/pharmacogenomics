@@ -65,18 +65,15 @@ public class PGXAnalysis {
 	private String dnaID;
 	private List<PGXGene> pgxGenes= new LinkedList<PGXGene>();
 	private VariantManagerAdapter vma= MedSavantClient.VariantManager;
-	private boolean assumeRef; // if true, assume reference calls for missing PGx markers
 	private boolean isCancelled= false;
 	
 	
 	/**
 	 * Perform a pharmacogenomic analysis.
 	 * @param dnaID the DNA ID for this individual
-	 * @param assumeRef if true and a marker is missing, assumes reference nucleotide. If false, marker is left blank.
 	 */
-	public PGXAnalysis(String dnaID, boolean assumeRef) throws SQLException, RemoteException, SessionExpiredException, PGXException {
+	public PGXAnalysis(String dnaID) throws SQLException, RemoteException, SessionExpiredException, PGXException {
 		this.dnaID= dnaID;
-		this.assumeRef= assumeRef;
 		
 		/* If no connection exists, initialize the local HyperSQL database for 
 		 * analyses. */
@@ -393,7 +390,7 @@ public class PGXAnalysis {
 		
 		for (PGXGene pg : pgxGenes) {
 			try {
-				pg.setDiplotype(PGXDBFunctions.getDiplotype(pg, this.assumeRef));
+				pg.setDiplotype(PGXDBFunctions.getDiplotype(pg));
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
