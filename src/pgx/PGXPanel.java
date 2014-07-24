@@ -579,7 +579,7 @@ public class PGXPanel {
 	 * Update the report panel.
 	 */
 	private void updateReportPane() {
-		tabs= ViewUtil.getMSTabedPane();
+		tabs= new JTabbedPane();
 		
 		/* Create a summary tab. */
 		JPanel summary= new JPanel();
